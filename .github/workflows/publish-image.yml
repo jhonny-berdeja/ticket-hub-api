@@ -50,7 +50,7 @@ jobs:
     # reviewers in the Review-deployments panel - the job name is the
     # only self-explanatory text that surfaces there, so it doubles as
     # that description.
-    name: "Approve: infra-hub will deploy this image to pcbox microk8s"
+    name: "Aprobar: infra-hub va a desplegar esta imagen en pcbox microk8s"
     needs: build-and-push
     runs-on: ubuntu-latest
     # Approval gate lives HERE, not in infra-hub (moved by explicit user
@@ -92,9 +92,9 @@ jobs:
         # This is just a visibility link, not an action to take.
         run: |
           {
-            echo "## 🚀 Deploy approved and dispatched to infra-hub"
+            echo "## 🚀 Deploy aprobado y disparado hacia infra-hub"
             echo ""
-            echo "This run pushed \`${{ secrets.DOCKERHUB_USERNAME }}/ticket-hub-api:${{ needs.build-and-push.outputs.image_tag }}\` and, once approved above, told \`infra-hub\` to deploy it to the pcbox microk8s cluster. infra-hub applies it automatically - no further approval needed there."
+            echo "Este run pusheó \`${{ secrets.DOCKERHUB_USERNAME }}/ticket-hub-api:${{ needs.build-and-push.outputs.image_tag }}\` y, una vez aprobado arriba, le avisó a \`infra-hub\` que despliegue esa imagen en el cluster microk8s de pcbox. infra-hub la aplica automáticamente - no hace falta otra aprobación ahí."
             echo ""
-            echo "**[▶ View the deploy run in infra-hub](https://github.com/${{ github.repository_owner }}/infra-hub/actions/workflows/deploy-ticket-hub-api.yml)**"
+            echo "**[▶ Ver el run de deploy en infra-hub](https://github.com/${{ github.repository_owner }}/infra-hub/actions/workflows/deploy-ticket-hub-api.yml)**"
           } >> "$GITHUB_STEP_SUMMARY"
