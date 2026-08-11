@@ -66,3 +66,20 @@ jobs:
             --repo "${{ github.repository_owner }}/infra-hub" \
             --ref master \
             -f image_tag="${{ steps.image_tag.outputs.tag }}"
+
+      - name: Link to the deploy in infra-hub
+        # GitHub Actions has no embeddable "button" inside a run page -
+        # the only real interactive control is the environment's native
+        # "Review deployments" approval button, which lives on infra-hub's
+        # side. This step writes a Job Summary (rendered at the bottom of
+        # this run's page) explaining that and linking straight to it.
+        run: |
+          {
+            echo "## 🚀 Deploy triggered in infra-hub"
+            echo ""
+            echo "This run pushed \`${{ secrets.DOCKERHUB_USERNAME }}/ticket-hub-api:${{ steps.image_tag.outputs.tag }}\` and told \`infra-hub\` to deploy it to the pcbox microk8s cluster."
+            echo ""
+            echo "If the \`production\` environment in \`infra-hub\` has required reviewers configured, that deploy run is now **waiting for approval** - open the link below, open the run, and click **Review deployments → Approve and deploy** to let it proceed. If no reviewers are configured yet, it already ran automatically."
+            echo ""
+            echo "**[▶ Open the infra-hub deploy workflow](https://github.com/${{ github.repository_owner }}/infra-hub/actions/workflows/deploy-ticket-hub-api.yml)**"
+          } >> "$GITHUB_STEP_SUMMARY"
