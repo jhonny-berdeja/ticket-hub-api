@@ -25,6 +25,27 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## Environment variables
+
+This app runs **only** as a Pod in the microk8s `ticket-hub` namespace. There is
+no local dev environment, no docker-compose Postgres, and no `.env` file —
+every value below arrives as a container env var injected by the Deployment
+manifest (`ConfigModule.forRoot({ ignoreEnvFile: true, validate })` fails fast
+at boot if any is missing).
+
+| Var | Required | Source (in-cluster) | Description |
+|---|---|---|---|
+| `POSTGRES_USER` | Yes | `envFrom: secretRef: ticket-hub-db-credentials` | Postgres role used to connect to `ticket-hub-db` |
+| `POSTGRES_PASSWORD` | Yes | `envFrom: secretRef: ticket-hub-db-credentials` | Password for `POSTGRES_USER` |
+| `DATABASE_HOST` | Yes | literal `env:` → `ticket-hub-db.ticket-hub.svc.cluster.local` | Postgres Service DNS name |
+| `DATABASE_PORT` | Yes | literal `env:` → `5432` | Postgres port |
+| `DATABASE_NAME` | Yes | literal `env:` → `ticket-hub-db` | Database name |
+| `JWT_SECRET` | Yes | `secretRef: ticket-hub-api-credentials` | Secret used to sign/verify login JWTs (1h expiry) |
+| `PORT` | Yes | literal `env:` → `3000` | HTTP port the Nest app listens on |
+
+`ticket-hub-api-credentials` does not exist yet and is a hard dependency of
+the deployment work that authors the Kubernetes manifests for this service.
+
 ## Project setup
 
 ```bash
