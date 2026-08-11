@@ -8,10 +8,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
-  UseGuards,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/guards/roles.decorator';
 import { Role } from '../../common/database/role/role.enum';
 import { ResponseBody } from '../../common/dto/response-body.dto';
@@ -22,13 +19,15 @@ import { UpdateUserService } from './update-user.service';
 import { UserWithRoles } from './user-with-roles';
 
 /**
- * Every route here requires an authenticated ADMIN (JwtAuthGuard runs
- * first to populate request.user, RolesGuard then checks it) - confirmed
- * product decision. The very first ADMIN can't come from this endpoint
- * (chicken-and-egg): it's assigned directly in the database once, by hand.
+ * Every route here requires an authenticated ADMIN. Authentication comes
+ * from the global JwtAuthGuard (populates request.user on every request
+ * by default); @Roles(Role.ADMIN) is read by the equally-global
+ * RolesGuard, which only enforces a check when a route declares one -
+ * this is the only controller that does. The very first ADMIN can't come
+ * from this endpoint (chicken-and-egg): it's assigned directly in the
+ * database once, by hand.
  */
 @Controller('users')
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
 export class UsersController {
   constructor(
