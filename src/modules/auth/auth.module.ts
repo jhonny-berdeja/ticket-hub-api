@@ -5,10 +5,12 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 
 /**
- * `UsersRepository` is not declared here: like `UsersModule`, it depends on
- * the shared `UsersRepository` independently via the `@Global()`
- * `DatabaseModule` — `AuthModule` and `UsersModule` never depend on each
- * other, avoiding a circular import between the two feature modules.
+ * `UsersRepository` is not declared here: it depends on it independently via
+ * the `@Global()` `DatabaseModule`, same as `UsersModule`. `AuthService` is
+ * exported so `UsersModule` can import `AuthModule` and reuse
+ * `hashPassword()` — a one-directional dependency (`UsersModule` →
+ * `AuthModule`); `AuthModule` never imports `UsersModule` back, so this
+ * stays acyclic.
  */
 @Module({
   imports: [
@@ -21,5 +23,6 @@ import { AuthService } from './auth.service';
   ],
   controllers: [AuthController],
   providers: [AuthService],
+  exports: [AuthService],
 })
 export class AuthModule {}

@@ -1,6 +1,7 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
-import { AuthService, LoginResult } from './auth.service';
+import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { ResponseLogin } from './dto/response-login.dto';
 
 /**
  * Stateless JSON endpoint — no cookies are set here. Cookie ownership lives
@@ -13,7 +14,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  login(@Body() dto: LoginDto): Promise<LoginResult> {
+  login(@Body() dto: LoginDto): Promise<ResponseLogin> {
     return this.authService.login(dto);
   }
 }

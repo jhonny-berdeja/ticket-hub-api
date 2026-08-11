@@ -87,7 +87,7 @@ curl -i -X POST http://localhost:3000/users \
   -d '{"name":"Ana","lastname":"Perez","email":"smoke-test@example.com","password":"secret1"}'
 ```
 
-Expected: `201 Created`, JSON body `{"id":<number>,"name":"Ana","lastname":"Perez","email":"smoke-test@example.com"}` — **no `password` key present**.
+Expected: `201 Created`, JSON body `{"msg":"User created successfully","data":{"id":<number>,"name":"Ana","lastname":"Perez","email":"smoke-test@example.com"}}` — **no `password` key present**.
 
 ```bash
 curl -i -X POST http://localhost:3000/auth/login \

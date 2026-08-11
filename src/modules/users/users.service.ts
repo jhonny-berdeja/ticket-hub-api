@@ -1,42 +1,37 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
-import { UsersRepository } from '../../shared/database/repositories/users.repository';
+import { AuthService } from '../auth/auth.service';
+import { UserEntity } from '../../common/database/user/user.entity';
+import { UsersRepository } from '../../common/database/user/users.repository';
+import { ResponseBody } from '../../common/dto/response-body.dto';
 import { CreateUserDto } from './dto/create-user.dto';
-
-/** ~60-char bcrypt output; well within the `password` column's VARCHAR(100). */
-const BCRYPT_SALT_ROUNDS = 10;
-
-export interface PublicUser {
-  id: number;
-  name: string;
-  lastname: string;
-  email: string;
-}
+import { UserMapper } from './user.mapper';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly usersRepository: UsersRepository) {}
+  constructor(
+    private readonly usersRepository: UsersRepository,
+    private readonly authService: AuthService,
+  ) {}
 
-  async create(dto: CreateUserDto): Promise<PublicUser> {
+  async create(
+    dto: CreateUserDto,
+  ): Promise<ResponseBody<Omit<UserEntity, 'password'>>> {
     const existing = await this.usersRepository.findByEmail(dto.email);
     if (existing) {
       throw new ConflictException('Email already in use');
     }
 
-    const hashedPassword = await bcrypt.hash(dto.password, BCRYPT_SALT_ROUNDS);
+    const hashedPassword = await this.authService.hashPassword(dto.password);
 
-    const user = await this.usersRepository.createUser({
-      name: dto.name,
-      lastname: dto.lastname,
-      email: dto.email,
-      password: hashedPassword,
-    });
+    const userEntity = UserMapper.toEntity(dto, hashedPassword);
 
-    return {
-      id: user.id,
-      name: user.name,
-      lastname: user.lastname,
-      email: user.email,
-    };
+    const createdUser = await this.usersRepository.createUser(userEntity);
+
+    const { password, ...publicUser } = createdUser;
+
+    return ResponseBody.builder<Omit<UserEntity, 'password'>>()
+      .withMsg('User created successfully')
+      .withData(publicUser)
+      .build();
   }
 }

@@ -1,9 +1,15 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from './entities/user.entity';
-import { UsersRepository } from './repositories/users.repository';
+import { UserEntity } from './user/user.entity';
+import { UsersRepository } from './user/users.repository';
 
+/**
+ * `EnvModule` is not imported here: it's `@Global()` too, so once it loads
+ * in `AppModule`, `ConfigService` is already injectable everywhere —
+ * `inject: [ConfigService]` below works without a local import, same reason
+ * `UsersModule`/`AuthModule` don't import this module to get `UsersRepository`.
+ */
 @Global()
 @Module({
   imports: [
@@ -19,15 +25,11 @@ import { UsersRepository } from './repositories/users.repository';
         username: configService.get<string>('POSTGRES_USER'),
         password: configService.get<string>('POSTGRES_PASSWORD'),
         database: configService.get<string>('DATABASE_NAME'),
-        entities: [User],
-        // The schema is an immutable baseline created once by the
-        // ticket-hub-db-init ConfigMap; the app must never create,
-        // alter, or drop tables.
+        entities: [UserEntity],
         synchronize: false,
-        migrationsRun: false,
       }),
     }),
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([UserEntity]),
   ],
   providers: [UsersRepository],
   exports: [UsersRepository, TypeOrmModule],

@@ -1,8 +1,10 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { UsersRepository } from '../../shared/database/repositories/users.repository';
+import { UsersRepository } from '../../common/database/user/users.repository';
 import { LoginDto } from './dto/login.dto';
+import { ResponseLogin } from './dto/response-login.dto';
+import { PayloadJwt } from './payload-jwt';
 
 /** Fixed session lifetime — "remember me" stays decorative for this slice. */
 const TOKEN_EXPIRY = '1h';
@@ -10,9 +12,8 @@ const TOKEN_EXPIRY = '1h';
 /** Identical for both "no such user" and "wrong password" — no user enumeration. */
 const INVALID_CREDENTIALS_MESSAGE = 'Invalid credentials';
 
-export interface LoginResult {
-  access_token: string;
-}
+/** ~60-char bcrypt output; well within the `password` column's VARCHAR(100). */
+const BCRYPT_SALT_ROUNDS = 10;
 
 @Injectable()
 export class AuthService {
@@ -21,7 +22,12 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async login(dto: LoginDto): Promise<LoginResult> {
+  /** Used by `UsersService` when provisioning a new account. */
+  hashPassword(password: string): Promise<string> {
+    return bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
+  }
+
+  async login(dto: LoginDto): Promise<ResponseLogin> {
     const user = await this.usersRepository.findByEmail(dto.email);
     if (!user) {
       throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
@@ -32,11 +38,15 @@ export class AuthService {
       throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
     }
 
-    const access_token = this.jwtService.sign(
-      { sub: user.id, email: user.email },
-      { expiresIn: TOKEN_EXPIRY },
-    );
+    const payload = PayloadJwt.builder()
+      .withSub(user.id)
+      .withEmail(user.email)
+      .build();
 
-    return { access_token };
+    const access_token = this.jwtService.sign(payload, {
+      expiresIn: TOKEN_EXPIRY,
+    });
+
+    return new ResponseLogin(access_token);
   }
 }
