@@ -2,10 +2,15 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { AuthService } from '../auth/auth.service';
 import { UsersRepository } from '../../common/database/user/users.repository';
 import { RolesRepository } from '../../common/database/role/roles.repository';
+import { Role } from '../../common/database/role/role.enum';
 import { ResponseBody } from '../../common/dto/response-body.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UserMapper } from './user.mapper';
 import { UserWithRoles } from './user-with-roles';
+import { AssignableUser } from './assignable-user';
+
+/** Roles allowed to be picked as a ticket assignee — a DEV creating a ticket must hand it to someone who can approve it. */
+const ASSIGNABLE_ROLES: Role[] = [Role.APPROVER, Role.ADMIN];
 
 @Injectable()
 export class UsersService {
@@ -50,6 +55,26 @@ export class UsersService {
 
     return ResponseBody.builder<UserWithRoles[]>()
       .withMsg('Users retrieved successfully')
+      .withData(data)
+      .build();
+  }
+
+  /** Reachable by any authenticated user (a DEV picking an assignee is not ADMIN) — returns only APPROVER/ADMIN users, and only the fields needed to pick one, never roles/password. */
+  async findAssignableApprovers(): Promise<ResponseBody<AssignableUser[]>> {
+    const roleEntities =
+      await this.rolesRepository.findByRoles(ASSIGNABLE_ROLES);
+    const uniqueUserIds = [...new Set(roleEntities.map((role) => role.idUser))];
+    const users = await this.usersRepository.findByIds(uniqueUserIds);
+
+    const data: AssignableUser[] = users.map((user) => ({
+      id: user.id,
+      name: user.name,
+      lastname: user.lastname,
+      email: user.email,
+    }));
+
+    return ResponseBody.builder<AssignableUser[]>()
+      .withMsg('Assignable users retrieved successfully')
       .withData(data)
       .build();
   }

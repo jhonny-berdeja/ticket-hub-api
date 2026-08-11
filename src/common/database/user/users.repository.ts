@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { UserEntity } from './user.entity';
 
 @Injectable()
@@ -20,6 +20,13 @@ export class UsersRepository {
 
   findAll(): Promise<UserEntity[]> {
     return this.repository.find();
+  }
+
+  findByIds(ids: number[]): Promise<UserEntity[]> {
+    if (ids.length === 0) {
+      return Promise.resolve([]);
+    }
+    return this.repository.find({ where: { id: In(ids) } });
   }
 
   createUser(user: UserEntity): Promise<UserEntity> {

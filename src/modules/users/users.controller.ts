@@ -17,6 +17,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
 import { UpdateUserService } from './update-user.service';
 import { UserWithRoles } from './user-with-roles';
+import { AssignableUser } from './assignable-user';
 
 /**
  * Every route here requires an authenticated ADMIN. Authentication comes
@@ -44,6 +45,20 @@ export class UsersController {
   @Get()
   findAll(): Promise<ResponseBody<UserWithRoles[]>> {
     return this.usersService.findAll();
+  }
+
+  /**
+   * Overrides the class-level ADMIN-only @Roles() with all three roles
+   * (equivalent to "any authenticated user", spelled out explicitly): a
+   * DEV creating a ticket needs to search assignable APPROVER/ADMIN
+   * users, and DEV is not ADMIN. usersService.findAssignableApprovers
+   * returns a deliberately narrow shape so this override never leaks
+   * more than picking an assignee requires.
+   */
+  @Get('approvers')
+  @Roles(Role.DEV, Role.APPROVER, Role.ADMIN)
+  findAssignableApprovers(): Promise<ResponseBody<AssignableUser[]>> {
+    return this.usersService.findAssignableApprovers();
   }
 
   @Patch(':id')

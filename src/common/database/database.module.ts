@@ -5,6 +5,8 @@ import { UserEntity } from './user/user.entity';
 import { UsersRepository } from './user/users.repository';
 import { RoleEntity } from './role/role.entity';
 import { RolesRepository } from './role/roles.repository';
+import { TicketEntity } from './ticket/ticket.entity';
+import { TicketsRepository } from './ticket/tickets.repository';
 
 /**
  * `EnvModule` is not imported here: it's `@Global()` too, so once it loads
@@ -27,13 +29,13 @@ import { RolesRepository } from './role/roles.repository';
         username: configService.get<string>('POSTGRES_USER'),
         password: configService.get<string>('POSTGRES_PASSWORD'),
         database: configService.get<string>('DATABASE_NAME'),
-        entities: [UserEntity, RoleEntity],
+        entities: [UserEntity, RoleEntity, TicketEntity],
         synchronize: false,
       }),
     }),
-    TypeOrmModule.forFeature([UserEntity, RoleEntity]),
+    TypeOrmModule.forFeature([UserEntity, RoleEntity, TicketEntity]),
   ],
-  providers: [UsersRepository, RolesRepository],
-  exports: [UsersRepository, RolesRepository, TypeOrmModule],
+  providers: [UsersRepository, RolesRepository, TicketsRepository],
+  exports: [UsersRepository, RolesRepository, TicketsRepository, TypeOrmModule],
 })
 export class DatabaseModule {}

@@ -4,6 +4,8 @@ import { UserEntity } from '../../src/common/database/user/user.entity';
 import { UsersRepository } from '../../src/common/database/user/users.repository';
 import { RoleEntity } from '../../src/common/database/role/role.entity';
 import { RolesRepository } from '../../src/common/database/role/roles.repository';
+import { TicketEntity } from '../../src/common/database/ticket/ticket.entity';
+import { TicketsRepository } from '../../src/common/database/ticket/tickets.repository';
 
 /**
  * Real, unmocked `TypeOrmModule` backed by a throwaway in-memory SQLite DB —
@@ -17,12 +19,12 @@ import { RolesRepository } from '../../src/common/database/role/roles.repository
     TypeOrmModule.forRoot({
       type: 'better-sqlite3',
       database: ':memory:',
-      entities: [UserEntity, RoleEntity],
+      entities: [UserEntity, RoleEntity, TicketEntity],
       synchronize: true,
     }),
-    TypeOrmModule.forFeature([UserEntity, RoleEntity]),
+    TypeOrmModule.forFeature([UserEntity, RoleEntity, TicketEntity]),
   ],
-  providers: [UsersRepository, RolesRepository],
-  exports: [UsersRepository, RolesRepository, TypeOrmModule],
+  providers: [UsersRepository, RolesRepository, TicketsRepository],
+  exports: [UsersRepository, RolesRepository, TicketsRepository, TypeOrmModule],
 })
 export class InMemoryDatabaseModule {}

@@ -22,6 +22,14 @@ export class RolesRepository {
     return this.repository.find({ where: { idUser: In(idUsers) } });
   }
 
+  /** Used to find candidate ticket assignees (APPROVER/ADMIN) — a user with any matching role has one row per role, so callers must de-dupe idUser themselves. */
+  findByRoles(roles: Role[]): Promise<RoleEntity[]> {
+    if (roles.length === 0) {
+      return Promise.resolve([]);
+    }
+    return this.repository.find({ where: { rol: In(roles) } });
+  }
+
   /** Bulk-inserts one row per role — used both on user creation and on edit's "add" side. */
   createRolesForUser(idUser: number, roles: Role[]): Promise<RoleEntity[]> {
     const entities = roles.map((rol) =>
