@@ -46,7 +46,11 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/ticket-hub-api:${{ steps.image_tag.outputs.tag }}
 
   dispatch-deploy:
-    name: Approve and dispatch deploy
+    # GitHub environments have no free-text "description" field shown to
+    # reviewers in the Review-deployments panel - the job name is the
+    # only self-explanatory text that surfaces there, so it doubles as
+    # that description.
+    name: "Approve: infra-hub will deploy this image to pcbox microk8s"
     needs: build-and-push
     runs-on: ubuntu-latest
     # Approval gate lives HERE, not in infra-hub (moved by explicit user
