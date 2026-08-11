@@ -43,15 +43,26 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/ticket-hub-api:${{ steps.image_tag.outputs.tag }}
 
-      - name: Dispatch deploy to infra-hub
+      - name: Trigger deploy in infra-hub
         # Least-privilege bridge (design ADR-3): the PAT behind
         # INFRA_HUB_DISPATCH_TOKEN is scoped to `actions: write` only on
         # infra-hub. It cannot commit, open a PR, or alter any infra-hub
         # file — it can only start the run that infra-hub gates behind
         # its own `production` Environment approval.
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.INFRA_HUB_DISPATCH_TOKEN }}
-          repository: ${{ github.repository_owner }}/infra-hub
-          event-type: deploy-ticket-hub-api
-          client-payload: '{"image_tag": "${{ steps.image_tag.outputs.tag }}"}'
+        #
+        # Uses `workflow_dispatch` via the GitHub CLI instead of
+        # `repository_dispatch`: per GitHub's REST API docs, the
+        # `POST /repos/{owner}/{repo}/dispatches` endpoint (used by
+        # repository_dispatch) requires `contents: write` on a
+        # fine-grained PAT, while `POST .../actions/workflows/{id}/dispatches`
+        # (workflow_dispatch) requires only `actions: write` — the scope
+        # this design actually promises. infra-hub's
+        # deploy-ticket-hub-api.yml already listens for workflow_dispatch
+        # with an `image_tag` input, so no change was needed on that side.
+        env:
+          GH_TOKEN: ${{ secrets.INFRA_HUB_DISPATCH_TOKEN }}
+        run: |
+          gh workflow run deploy-ticket-hub-api.yml \
+            --repo "${{ github.repository_owner }}/infra-hub" \
+            --ref master \
+            -f image_tag="${{ steps.image_tag.outputs.tag }}"
