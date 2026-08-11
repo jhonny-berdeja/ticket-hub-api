@@ -46,6 +46,9 @@ lerna-debug.log*
 .env.production.local
 .env.local
 
+# real k8s secret manifests — only the .example.yaml templates are committed
+.kubernetes/secret.yaml
+
 # temp directory
 .temp
 .tmp

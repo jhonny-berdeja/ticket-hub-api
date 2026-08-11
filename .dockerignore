@@ -1,0 +1,16 @@
+node_modules
+dist
+coverage
+.git
+.github
+.vscode
+.idea
+.claude
+.atl
+.kubernetes
+test
+*.md
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
