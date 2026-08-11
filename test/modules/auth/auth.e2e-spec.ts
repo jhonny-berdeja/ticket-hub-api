@@ -4,6 +4,7 @@ import { App } from 'supertest/types';
 import { AuthModule } from '../../../src/modules/auth/auth.module';
 import { UsersModule } from '../../../src/modules/users/users.module';
 import { UsersService } from '../../../src/modules/users/users.service';
+import { Role } from '../../../src/common/database/role/role.enum';
 import { bootstrapTestApp } from '../../common/bootstrap-test-app';
 
 /**
@@ -28,6 +29,7 @@ describe('Auth flow (e2e, in-memory DB)', () => {
       lastname: 'Perez',
       email: KNOWN_EMAIL,
       password: KNOWN_PASSWORD,
+      roles: [Role.DEV],
     });
   });
 

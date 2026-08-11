@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from './user/user.entity';
 import { UsersRepository } from './user/users.repository';
+import { RoleEntity } from './role/role.entity';
+import { RolesRepository } from './role/roles.repository';
 
 /**
  * `EnvModule` is not imported here: it's `@Global()` too, so once it loads
@@ -25,13 +27,13 @@ import { UsersRepository } from './user/users.repository';
         username: configService.get<string>('POSTGRES_USER'),
         password: configService.get<string>('POSTGRES_PASSWORD'),
         database: configService.get<string>('DATABASE_NAME'),
-        entities: [UserEntity],
+        entities: [UserEntity, RoleEntity],
         synchronize: false,
       }),
     }),
-    TypeOrmModule.forFeature([UserEntity]),
+    TypeOrmModule.forFeature([UserEntity, RoleEntity]),
   ],
-  providers: [UsersRepository],
-  exports: [UsersRepository, TypeOrmModule],
+  providers: [UsersRepository, RolesRepository],
+  exports: [UsersRepository, RolesRepository, TypeOrmModule],
 })
 export class DatabaseModule {}

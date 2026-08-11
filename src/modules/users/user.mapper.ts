@@ -1,5 +1,8 @@
 import { UserEntity } from '../../common/database/user/user.entity';
+import { RoleEntity } from '../../common/database/role/role.entity';
+import { Role } from '../../common/database/role/role.enum';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UserWithRoles } from './user-with-roles';
 
 export class UserMapper {
   /** Maps the incoming DTO plus its already-hashed password to a persistable entity. */
@@ -10,5 +13,16 @@ export class UserMapper {
       .withEmail(dto.email)
       .withPassword(hashedPassword)
       .build();
+  }
+
+  /** Combines a persisted user with its role rows into the public response shape — password never included. */
+  static toResponse(user: UserEntity, roles: RoleEntity[]): UserWithRoles {
+    return {
+      id: user.id,
+      name: user.name,
+      lastname: user.lastname,
+      email: user.email,
+      roles: roles.map((role): Role => role.rol),
+    };
   }
 }

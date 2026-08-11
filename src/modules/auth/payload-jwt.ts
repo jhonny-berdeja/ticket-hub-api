@@ -1,7 +1,15 @@
-/** Shape signed into the JWT — kept minimal on purpose, never carries the password. */
+import { Role } from '../../common/database/role/role.enum';
+
+/**
+ * Shape signed into the JWT — kept minimal on purpose, never carries the
+ * password. `roles` is a snapshot taken at login time: a role change
+ * doesn't take effect until the user logs in again (within the token's
+ * 1h lifetime, at most).
+ */
 export class PayloadJwt {
   sub!: number;
   email!: string;
+  roles!: Role[];
 
   static builder(): PayloadJwtBuilder {
     return new PayloadJwtBuilder();
@@ -12,6 +20,7 @@ export class PayloadJwt {
 export class PayloadJwtBuilder {
   private sub?: number;
   private email?: string;
+  private roles?: Role[];
 
   withSub(sub: number): this {
     this.sub = sub;
@@ -23,6 +32,11 @@ export class PayloadJwtBuilder {
     return this;
   }
 
+  withRoles(roles: Role[]): this {
+    this.roles = roles;
+    return this;
+  }
+
   build(): PayloadJwt {
     if (this.sub === undefined) {
       throw new Error('PayloadJwt.Builder: sub is required');
@@ -30,10 +44,13 @@ export class PayloadJwtBuilder {
     if (this.email === undefined) {
       throw new Error('PayloadJwt.Builder: email is required');
     }
+    if (this.roles === undefined) {
+      throw new Error('PayloadJwt.Builder: roles is required');
+    }
 
     // A plain object literal, not `new PayloadJwt()`: `jsonwebtoken`'s
     // `sign()` requires the payload to be a *plain* object (via
     // `lodash.isPlainObject`) and rejects class instances outright.
-    return { sub: this.sub, email: this.email };
+    return { sub: this.sub, email: this.email, roles: this.roles };
   }
 }

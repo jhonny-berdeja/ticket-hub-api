@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersRepository } from '../../common/database/user/users.repository';
+import { RolesRepository } from '../../common/database/role/roles.repository';
 import { LoginDto } from './dto/login.dto';
 import { ResponseLogin } from './dto/response-login.dto';
 import { PayloadJwt } from './payload-jwt';
@@ -19,6 +20,7 @@ const BCRYPT_SALT_ROUNDS = 10;
 export class AuthService {
   constructor(
     private readonly usersRepository: UsersRepository,
+    private readonly rolesRepository: RolesRepository,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -38,9 +40,12 @@ export class AuthService {
       throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
     }
 
+    const roleEntities = await this.rolesRepository.findByUserId(user.id);
+
     const payload = PayloadJwt.builder()
       .withSub(user.id)
       .withEmail(user.email)
+      .withRoles(roleEntities.map((role) => role.rol))
       .build();
 
     const access_token = this.jwtService.sign(payload, {
