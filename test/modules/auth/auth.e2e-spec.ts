@@ -47,4 +47,36 @@ describe('Auth flow (e2e, in-memory DB)', () => {
     expect(typeof body.access_token).toBe('string');
     expect(body.access_token.length).toBeGreaterThan(0);
   });
+
+  it('GET /auth/me returns the caller identity/roles, any authenticated user', async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: KNOWN_EMAIL, password: KNOWN_PASSWORD })
+      .expect(200);
+    const { access_token: token } = loginResponse.body as {
+      access_token: string;
+    };
+
+    const response = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(response.body).toEqual({
+      msg: 'Current user',
+      data: {
+        sub: expect.any(Number) as number,
+        email: KNOWN_EMAIL,
+        roles: [Role.DEV],
+        // jwtService.verifyAsync adds these standard JWT claims on top
+        // of the signed payload - not something PayloadJwt itself sets.
+        iat: expect.any(Number) as number,
+        exp: expect.any(Number) as number,
+      },
+    });
+  });
+
+  it('rejects GET /auth/me with no bearer token', async () => {
+    await request(app.getHttpServer()).get('/auth/me').expect(401);
+  });
 });
