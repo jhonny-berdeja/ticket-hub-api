@@ -43,18 +43,24 @@ at boot if any is missing).
 | `JWT_SECRET` | Yes | `secretRef: ticket-hub-api-credentials` | Secret used to sign/verify login JWTs (1h expiry) |
 | `PORT` | Yes | literal `env:` → `3000` | HTTP port the Nest app listens on |
 
-`ticket-hub-api-credentials` does not exist yet and is a hard dependency of
-the deployment work that authors the Kubernetes manifests for this service.
+`ticket-hub-api-credentials` does not exist yet — creating it in-cluster is
+one of the manual setup steps for the `infra-hub` deploy pipeline (see
+`infra-hub/apps/ticket-hub-api/`).
 
 ## Manual verification (once deployed in-cluster)
 
-This app has no Kubernetes Deployment/Service manifests yet — that work is a
-separate, not-yet-scheduled change. All automated tests here run against a
-mocked repository (`getRepositoryToken(User)` / a fake `UsersRepository`),
-never a real Postgres, by design (see "Environment variables" above). The
-checklist below cannot run today; it is written so the change that ships the
-manifests and the `ticket-hub-api-credentials` Secret can confirm the real
-DB round trip without re-deriving these steps from the spec/design.
+Kubernetes Deployment/Service manifests for this app live in the separate
+`infra-hub` repo, under `apps/ticket-hub-api/` (change `infra-hub-cicd`) —
+not in this repo. This app's CI (`.github/workflows/publish-image.yml`)
+only builds and pushes the image and dispatches a deploy event; it never
+touches Kubernetes directly. All automated tests here run against a mocked
+repository (`getRepositoryToken(User)` / a fake `UsersRepository`), never a
+real Postgres, by design (see "Environment variables" above). The checklist
+below cannot run today; it needs `infra-hub`'s deploy pipeline to have
+actually applied those manifests and the `ticket-hub-api-credentials`
+Secret to exist in-cluster first — it is written so that first real deploy
+can confirm the DB round trip without re-deriving these steps from the
+spec/design.
 
 ### 1. Confirm the Pods are up
 
