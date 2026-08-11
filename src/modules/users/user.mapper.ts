@@ -2,6 +2,7 @@ import { UserEntity } from '../../common/database/user/user.entity';
 import { RoleEntity } from '../../common/database/role/role.entity';
 import { Role } from '../../common/database/role/role.enum';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { UserWithRoles } from './user-with-roles';
 
 export class UserMapper {
@@ -13,6 +14,17 @@ export class UserMapper {
       .withEmail(dto.email)
       .withPassword(hashedPassword)
       .build();
+  }
+
+  /** Maps the DTO's editable fields for a full-replace update — password and roles go through their own flows, not this one. */
+  static toUpdateFields(
+    dto: UpdateUserDto,
+  ): Pick<UserEntity, 'name' | 'lastname' | 'email'> {
+    return {
+      name: dto.name,
+      lastname: dto.lastname,
+      email: dto.email,
+    };
   }
 
   /** Combines a persisted user with its role rows into the public response shape — password never included. */

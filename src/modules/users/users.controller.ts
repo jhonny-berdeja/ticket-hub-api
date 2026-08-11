@@ -18,6 +18,7 @@ import { ResponseBody } from '../../common/dto/response-body.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
+import { UpdateUserService } from './update-user.service';
 import { UserWithRoles } from './user-with-roles';
 
 /**
@@ -30,7 +31,10 @@ import { UserWithRoles } from './user-with-roles';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly updateUserService: UpdateUserService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -48,6 +52,6 @@ export class UsersController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateUserDto,
   ): Promise<ResponseBody<UserWithRoles>> {
-    return this.usersService.update(id, dto);
+    return this.updateUserService.update(id, dto);
   }
 }

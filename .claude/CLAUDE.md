@@ -54,6 +54,63 @@ si falta algún campo obligatorio. Forma de referencia: `UserEntity`,
   un objeto literal plano, no `new NombreClase()` — ver
   `PayloadJwtBuilder.build()` para el porqué y el cómo.
 
+## Patrón de mappers
+
+Cada entidad/agregado que se expone por HTTP tiene un mapper dedicado
+(`<Entidad>Mapper`), ubicado en la raíz del módulo (no en `dto/`), con
+métodos **únicamente `static`** — funciones puras, sin I/O ni estado.
+
+- Un método por dirección de transformación, nombrado `to<Destino>`:
+  - `toEntity(dto, ...valoresYaDerivados)` — DTO de entrada (+ algún
+    valor calculado antes de llamar al mapper, como un password ya
+    hasheado) → entidad persistible, construida vía el `.builder()` de
+    la entidad.
+  - `to<Operación>Fields(dto)` (p. ej. `toUpdateFields`) — DTO → un
+    `Pick<Entidad, ...>` acotado a *solo* los campos que esa operación
+    puntual tiene permitido tocar.
+  - `toResponse(entity, ...datosRelacionados)` — entidad persistida (+
+    datos relacionados, si los hay) → forma pública de respuesta. Acá es
+    donde se descartan los campos que nunca deben salir (p. ej.
+    `password`).
+- Cada operación de escritura (create, update, ...) tiene su **propio**
+  método de mapeo — nunca uno genérico reutilizado entre operaciones
+  distintas. Aunque compartan campos, cada método documenta con su
+  nombre y su tipo de retorno exactamente qué campos esa operación tiene
+  permitido tocar (p. ej. un update de perfil no debe poder tocar
+  `password` ni `roles` porque esos van por flujos propios).
+- El service nunca arma objetos de entidad o de respuesta a mano,
+  inline. El flujo siempre es: buscar/validar → derivar (hash, etc.) →
+  mapear a entidad/campos con el mapper → llamar al repository → mapear
+  el resultado a respuesta con el mapper. El mapper es la única costura
+  entre "entidad" y "DTO/respuesta". Referencia: `UserMapper`.
+
+## Handlers en el service general vs. service dedicado
+
+El service general de un módulo (`<Módulo>Service`) reúne los métodos
+handler de sus casos de uso (uno por endpoint). Cuándo un handler se
+queda ahí y cuándo se muda a su propio archivo depende de si necesita
+apoyarse en helpers privados propios:
+
+- **Handler autocontenido** (solo orquesta llamadas a repository/mapper/
+  otros services inyectados, sin métodos privados propios) → se queda en
+  el service general del módulo. Ejemplos: `UsersService.create`,
+  `UsersService.findAll`, `AuthService.login`.
+- **Handler que llama a helpers privados definidos en el mismo archivo
+  solo para él** → el handler completo (método público + todos sus
+  helpers privados) se muda a un archivo de service dedicado y exclusivo
+  para esa operación. Convención de nombres: `<operación>-<entidad>.
+  service.ts` con clase `<Operación><Entidad>Service` (p. ej.
+  `update-user.service.ts` → `UpdateUserService`), registrado como
+  provider en el módulo y usado directamente por el controller para ese
+  endpoint puntual — el service general no delega en él ni lo envuelve.
+  Referencia: `UpdateUserService` (extraído de `UsersService.update`
+  porque dependía de `findExistingUserOrThrow` y
+  `assertEmailNotTakenByAnotherUser`).
+
+El objetivo es que revisar un handler simple no obligue a leer el
+archivo general completo, y que un handler con lógica auxiliar propia
+quede aislado en un archivo chico y fácil de revisar solo.
+
 ## Variables de entorno
 
 `src/common/config/env.validation.ts` es la única fuente de verdad para
