@@ -12,9 +12,11 @@ permissions:
   contents: read
 
 jobs:
-  build-and-dispatch:
-    name: Build, push and dispatch deploy
+  build-and-push:
+    name: Build and push image
     runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.image_tag.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,43 +45,52 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/ticket-hub-api:${{ steps.image_tag.outputs.tag }}
 
+  dispatch-deploy:
+    name: Approve and dispatch deploy
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    # Approval gate lives HERE, not in infra-hub (moved by explicit user
+    # decision). The native "Review deployments -> Approve and deploy"
+    # button GitHub renders for a gated environment appears right on
+    # THIS run's page, at the end of the process the person pushing to
+    # master is already watching - no need to jump to another repo to
+    # find the button. Configure required reviewers on THIS repo's
+    # `production` environment (any collaborator, not leads-only - that
+    # restriction applies to infra-hub's CODEOWNERS/branch-protection on
+    # code changes, a separate concern). infra-hub's own `production`
+    # environment is intentionally left without required reviewers, so
+    # once this gate approves, the deploy proceeds there without a
+    # second click - the manual workflow_dispatch button on infra-hub's
+    # side remains ungated as a deliberate trade-off (see design).
+    environment: production
+    steps:
       - name: Trigger deploy in infra-hub
         # Least-privilege bridge (design ADR-3): the PAT behind
         # INFRA_HUB_DISPATCH_TOKEN is scoped to `actions: write` only on
         # infra-hub. It cannot commit, open a PR, or alter any infra-hub
-        # file — it can only start the run that infra-hub gates behind
-        # its own `production` Environment approval.
-        #
-        # Uses `workflow_dispatch` via the GitHub CLI instead of
-        # `repository_dispatch`: per GitHub's REST API docs, the
-        # `POST /repos/{owner}/{repo}/dispatches` endpoint (used by
-        # repository_dispatch) requires `contents: write` on a
-        # fine-grained PAT, while `POST .../actions/workflows/{id}/dispatches`
-        # (workflow_dispatch) requires only `actions: write` — the scope
-        # this design actually promises. infra-hub's
-        # deploy-ticket-hub-api.yml already listens for workflow_dispatch
-        # with an `image_tag` input, so no change was needed on that side.
+        # file - it can only start the run that this gate already
+        # approved. Uses `workflow_dispatch` via the GitHub CLI, not
+        # `repository_dispatch`: the latter's `dispatches` endpoint
+        # requires `contents: write` on a fine-grained PAT, which would
+        # defeat this scope (verified against GitHub's REST API docs).
         env:
           GH_TOKEN: ${{ secrets.INFRA_HUB_DISPATCH_TOKEN }}
         run: |
           gh workflow run deploy-ticket-hub-api.yml \
             --repo "${{ github.repository_owner }}/infra-hub" \
             --ref master \
-            -f image_tag="${{ steps.image_tag.outputs.tag }}"
+            -f image_tag="${{ needs.build-and-push.outputs.image_tag }}"
 
       - name: Link to the deploy in infra-hub
-        # GitHub Actions has no embeddable "button" inside a run page -
-        # the only real interactive control is the environment's native
-        # "Review deployments" approval button, which lives on infra-hub's
-        # side. This step writes a Job Summary (rendered at the bottom of
-        # this run's page) explaining that and linking straight to it.
+        # This step runs only after the approval gate above has already
+        # passed, so infra-hub's run proceeds without a second approval
+        # (its own `production` environment has no required reviewers).
+        # This is just a visibility link, not an action to take.
         run: |
           {
-            echo "## 🚀 Deploy triggered in infra-hub"
+            echo "## 🚀 Deploy approved and dispatched to infra-hub"
             echo ""
-            echo "This run pushed \`${{ secrets.DOCKERHUB_USERNAME }}/ticket-hub-api:${{ steps.image_tag.outputs.tag }}\` and told \`infra-hub\` to deploy it to the pcbox microk8s cluster."
+            echo "This run pushed \`${{ secrets.DOCKERHUB_USERNAME }}/ticket-hub-api:${{ needs.build-and-push.outputs.image_tag }}\` and, once approved above, told \`infra-hub\` to deploy it to the pcbox microk8s cluster. infra-hub applies it automatically - no further approval needed there."
             echo ""
-            echo "If the \`production\` environment in \`infra-hub\` has required reviewers configured, that deploy run is now **waiting for approval** - open the link below, open the run, and click **Review deployments → Approve and deploy** to let it proceed. If no reviewers are configured yet, it already ran automatically."
-            echo ""
-            echo "**[▶ Open the infra-hub deploy workflow](https://github.com/${{ github.repository_owner }}/infra-hub/actions/workflows/deploy-ticket-hub-api.yml)**"
+            echo "**[▶ View the deploy run in infra-hub](https://github.com/${{ github.repository_owner }}/infra-hub/actions/workflows/deploy-ticket-hub-api.yml)**"
           } >> "$GITHUB_STEP_SUMMARY"
