@@ -159,6 +159,24 @@ jobs:
           IMAGE_TAG: ${{ inputs.new_tag }}
         run: .github/scripts/dispatch-infra-hub-deploy.sh "$REPOSITORY_OWNER" "$IMAGE_TAG"
 
+      # Posted before the wait below (not after) so a developer watching
+      # this job live sees it immediately, and so it still exists if the
+      # wait ends up failing -- a GitHub Actions ::notice:: renders as a
+      # colored banner in the Checks UI, far more visible than plain
+      # GITHUB_STEP_SUMMARY text.
+      - name: Post a notice that this job now depends on the infra-hub deploy run.
+        env:
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          echo "::notice title=Este paso depende de infra-hub::El deploy real corre en otro workflow, no acá. Seguilo en vivo y confirmá que termine bien: https://github.com/$REPOSITORY_OWNER/infra-hub/actions/workflows/deploy-ticket-hub-api.yml"
+
+      - name: Write the infra-hub deploy link to GITHUB_STEP_SUMMARY.
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          IMAGE_TAG: ${{ inputs.new_tag }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: .github/scripts/render-infra-hub-dispatch-summary.sh "$DOCKERHUB_USERNAME" "$IMAGE_TAG" "$REPOSITORY_OWNER" >> "$GITHUB_STEP_SUMMARY"
+
       # gh workflow run is fire-and-forget -- without this step,
       # cleanup-tags (needs: approve-and-deploy) would start as soon as
       # the dispatch call above returns, in parallel with the actual
@@ -169,13 +187,6 @@ jobs:
           GH_TOKEN: ${{ secrets.INFRA_HUB_DISPATCH_TOKEN }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: .github/scripts/wait-for-infra-hub-deploy.sh "$REPOSITORY_OWNER" "$DISPATCH_TIME"
-
-      - name: Write the infra-hub deploy link to GITHUB_STEP_SUMMARY.
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          IMAGE_TAG: ${{ inputs.new_tag }}
-          REPOSITORY_OWNER: ${{ github.repository_owner }}
-        run: .github/scripts/render-infra-hub-dispatch-summary.sh "$DOCKERHUB_USERNAME" "$IMAGE_TAG" "$REPOSITORY_OWNER" >> "$GITHUB_STEP_SUMMARY"
 
   cleanup-tags:
     name: Delete every ticket-hub-api Docker Hub tag except the two kept tags.
