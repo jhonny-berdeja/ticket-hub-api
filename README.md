@@ -51,16 +51,25 @@ one of the manual setup steps for the `infra-hub` deploy pipeline (see
 
 Kubernetes Deployment/Service manifests for this app live in the separate
 `infra-hub` repo, under `apps/ticket-hub-api/` (change `infra-hub-cicd`) —
-not in this repo. This app's CI (`.github/workflows/publish-image.yml`)
-only builds and pushes the image and dispatches a deploy event; it never
-touches Kubernetes directly. All automated tests here run against a mocked
-repository (`getRepositoryToken(User)` / a fake `UsersRepository`), never a
-real Postgres, by design (see "Environment variables" above). The checklist
-below cannot run today; it needs `infra-hub`'s deploy pipeline to have
-actually applied those manifests and the `ticket-hub-api-credentials`
-Secret to exist in-cluster first — it is written so that first real deploy
-can confirm the DB round trip without re-deriving these steps from the
-spec/design.
+not in this repo. This app's CI (`.github/workflows/release-ticket-hub-api.yml`)
+builds and pushes the image, creates its git tag, and dispatches a deploy
+event; it never touches Kubernetes directly. All automated tests here run
+against a mocked repository (`getRepositoryToken(User)` / a fake
+`UsersRepository`), never a real Postgres, by design (see "Environment
+variables" above). The checklist below cannot run today; it needs
+`infra-hub`'s deploy pipeline to have actually applied those manifests and
+the `ticket-hub-api-credentials` Secret to exist in-cluster first — it is
+written so that first real deploy can confirm the DB round trip without
+re-deriving these steps from the spec/design.
+
+`.github/workflows/release-ticket-hub-api.yml` is a manually-triggered
+(`workflow_dispatch`-only) workflow: you name the previous stable tag and
+the new tag to release, and it validates both, builds and publishes the
+image, creates the git tag, dispatches the deploy (behind a `production`
+environment approval), and then deletes every other Docker Hub tag for
+this image, keeping only those two. It needs `secrets.DOCKERHUB_TOKEN` to
+have delete scope, not just push/read — see the comment at the top of that
+workflow file for how to regenerate it.
 
 ### 1. Confirm the Pods are up
 
