@@ -13,32 +13,33 @@ permissions:
 
 jobs:
   build-and-push:
-    name: Build and push image
+    name: Build and push ticket-hub-api image to Docker Hub.
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.image_tag.outputs.tag }}
     steps:
-      - name: Checkout
+      - name: Clone the repository to access the code and scripts.
         uses: actions/checkout@v4
 
-      - name: Determine image tag
-        id: image_tag
-        # Branch-name tag (design ADR-2). Only `master` can trigger this
-        # workflow, so the tag is always `master` in practice; the
-        # sanitization below is defensive future-proofing, not a live
-        # fix, in case the trigger surface is ever broadened.
-        run: |
-          RAW="${{ github.ref_name }}"
-          SAFE="$(echo "$RAW" | sed -E 's/[^a-zA-Z0-9._-]/-/g')"
-          echo "tag=$SAFE" >> "$GITHUB_OUTPUT"
+      - name: Save BRANCH_NAME to GITHUB_ENV file.
+        run: echo "BRANCH_NAME=${{ github.ref_name }}" >> "$GITHUB_ENV"
 
-      - name: Log in to Docker Hub
+      - name: Save sanitized branch name to GITHUB_ENV.
+        run: |
+          BRANCH_NAME_SANITIZED="$(echo "$BRANCH_NAME" | sed -E 's/[^a-zA-Z0-9._-]/-/g')"
+          echo "BRANCH_NAME_SANITIZED=$BRANCH_NAME_SANITIZED" >> "$GITHUB_ENV"
+
+      - name: Save tag value to GITHUB_OUTPUT file.
+        id: image_tag
+        run: echo "tag=$BRANCH_NAME_SANITIZED" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Docker Hub.
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push ticket-hub-api image to Docker Hub.
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -46,37 +47,12 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/ticket-hub-api:${{ steps.image_tag.outputs.tag }}
 
   dispatch-deploy:
-    # GitHub environments have no free-text "description" field shown to
-    # reviewers in the Review-deployments panel - the job name is the
-    # only self-explanatory text that surfaces there, so it doubles as
-    # that description.
-    name: "Aprobar: infra-hub va a desplegar esta imagen en pcbox microk8s"
+    name: "Approve: infra-hub will deploy ticket-hub-api to pcbox microk8s."
     needs: build-and-push
     runs-on: ubuntu-latest
-    # Approval gate lives HERE, not in infra-hub (moved by explicit user
-    # decision). The native "Review deployments -> Approve and deploy"
-    # button GitHub renders for a gated environment appears right on
-    # THIS run's page, at the end of the process the person pushing to
-    # master is already watching - no need to jump to another repo to
-    # find the button. Configure required reviewers on THIS repo's
-    # `production` environment (any collaborator, not leads-only - that
-    # restriction applies to infra-hub's CODEOWNERS/branch-protection on
-    # code changes, a separate concern). infra-hub's own `production`
-    # environment is intentionally left without required reviewers, so
-    # once this gate approves, the deploy proceeds there without a
-    # second click - the manual workflow_dispatch button on infra-hub's
-    # side remains ungated as a deliberate trade-off (see design).
     environment: production
     steps:
-      - name: Trigger deploy in infra-hub
-        # Least-privilege bridge (design ADR-3): the PAT behind
-        # INFRA_HUB_DISPATCH_TOKEN is scoped to `actions: write` only on
-        # infra-hub. It cannot commit, open a PR, or alter any infra-hub
-        # file - it can only start the run that this gate already
-        # approved. Uses `workflow_dispatch` via the GitHub CLI, not
-        # `repository_dispatch`: the latter's `dispatches` endpoint
-        # requires `contents: write` on a fine-grained PAT, which would
-        # defeat this scope (verified against GitHub's REST API docs).
+      - name: Enable workflow_dispatch in infra-hub to deploy the ticket-hub-api image.
         env:
           GH_TOKEN: ${{ secrets.INFRA_HUB_DISPATCH_TOKEN }}
         run: |
@@ -86,10 +62,6 @@ jobs:
             -f image_tag="${{ needs.build-and-push.outputs.image_tag }}"
 
       - name: Link to the deploy in infra-hub
-        # This step runs only after the approval gate above has already
-        # passed, so infra-hub's run proceeds without a second approval
-        # (its own `production` environment has no required reviewers).
-        # This is just a visibility link, not an action to take.
         run: |
           {
             echo "## 🚀 Deploy aprobado y disparado hacia infra-hub"
