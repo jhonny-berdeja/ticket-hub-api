@@ -37,9 +37,16 @@ jobs:
     name: Validate the previous stable and new tags before anything else runs.
     runs-on: ubuntu-latest
     steps:
+      # fetch-tags alone is not enough with the default shallow checkout
+      # (fetch-depth: 1): it fetches tag refs, but not the commit
+      # objects older tags point to if that commit isn't the tip of the
+      # branch -- git-tag-exists.sh then can't resolve them and reports
+      # a real tag as missing. fetch-depth: 0 pulls full history so
+      # every tagged commit is actually present locally.
       - name: Clone the repository to access the code, scripts, and tags.
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           fetch-tags: true
 
       - name: Save the previous stable tag input to GITHUB_ENV.
