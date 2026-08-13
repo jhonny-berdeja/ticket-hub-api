@@ -151,7 +151,13 @@ jobs:
     name: "Approve: infra-hub will deploy ticket-hub-api to pcbox microk8s."
     needs: build-and-push
     runs-on: ubuntu-latest
-    environment: production
+    # `url:` isn't "where the app lives" here -- it's a second, more
+    # visible surface for the same infra-hub link the notice already
+    # posts: GitHub renders it in the repo's Environments page and as a
+    # "View deployment" link on the run's own visualization graph.
+    environment:
+      name: production
+      url: https://github.com/${{ github.repository_owner }}/infra-hub/actions/workflows/deploy-ticket-hub-api.yml
     steps:
       - name: Clone the repository to access the code and scripts.
         uses: actions/checkout@v4
