@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Options } from 'pino-http';
 
 /**
@@ -12,6 +13,13 @@ export function buildLoggerOptions(level: string): { pinoHttp: Options } {
   return {
     pinoHttp: {
       level,
+      // pino-http's default `genReqId` is an in-memory counter (1, 2, 3,
+      // ...), not a UUID — it resets on every Pod restart and collides
+      // across replicas if this ever scales beyond one, which breaks
+      // correlating a `req.id` across log lines in Loki. A UUID per
+      // request is unique regardless of Pod/restart, no extra header or
+      // upstream coordination required.
+      genReqId: () => randomUUID(),
       // The app runs cluster-only (see README "Environment variables"):
       // stdout always goes to Loki via Promtail, so pino's default JSON
       // transport is what we want — no conditional "pretty" mode for a
