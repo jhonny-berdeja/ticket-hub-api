@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Renders the "deploy dispatched to infra-hub" GITHUB_STEP_SUMMARY
-# section for publish-image.yml. Prints Markdown to stdout -- appending
-# it to $GITHUB_STEP_SUMMARY is the caller's job (in publish-image.yml),
+# section for release-ticket-hub-api.yml. Prints Markdown to stdout -- appending
+# it to $GITHUB_STEP_SUMMARY is the caller's job (in release-ticket-hub-api.yml),
 # not this script's.
 #
 # Usage: render-infra-hub-dispatch-summary.sh <dockerhub-username> <image-tag> <repository-owner>

@@ -6,7 +6,7 @@
 # the file is empty and no empty-message is given, prints nothing.
 #
 # Shared by the "kept tags" and "deleted tags" summary steps in
-# cleanup-image-tags.yml -- same rendering, only the empty-message
+# release-ticket-hub-api.yml -- same rendering, only the empty-message
 # differs (the kept-tags step passes none, matching its prior
 # behavior of showing no fallback line).
 #

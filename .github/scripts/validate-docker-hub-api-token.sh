@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Validates a Docker Hub Hub API login token. Masking it in the job's
 # logs and saving it to $GITHUB_ENV is the caller's job (in
-# cleanup-image-tags.yml), not this script's.
+# release-ticket-hub-api.yml), not this script's.
 #
 # Usage: validate-docker-hub-api-token.sh <unvalidated-token>
 # Exit 0: token is valid. Exit 1: token is empty or the literal "null"

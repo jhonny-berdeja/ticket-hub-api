@@ -5,7 +5,7 @@
 # stdout, one per line, in the same order as the input file.
 #
 # Shared by both the "tags to keep" and "tags to delete" steps in
-# cleanup-image-tags.yml -- same partition, opposite side, so one
+# release-ticket-hub-api.yml -- same partition, opposite side, so one
 # script covers both instead of duplicating the loop.
 #
 # Usage: filter-tags.sh <keep|delete> <tag-file> <kept-tag-1> <kept-tag-2>

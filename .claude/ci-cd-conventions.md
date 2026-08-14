@@ -71,6 +71,94 @@ en una sola línea.
    "$SCRIPT_DIR/otro-script.sh" "$ARG"
    ```
 
+5. **`scripts/` vive hermano de `workflows/`, dentro de `.github/`.**
+   No en la raíz del repo — solo lo usan los workflows, así que queda
+   `.github/scripts/` (con `.github/scripts/tests/` adentro). Los
+   `run:` referencian el path completo: `.github/scripts/algo.sh`.
+
+## Separar "chequear" de "exigir": patrón checker + assert
+
+Cuando una validación tiene que poder fallar en las dos direcciones
+según el caso (un tag que *no debe* existir todavía vs. uno que *sí
+debe* existir ya), no se escribe el `if`/mensaje/`exit 1` inline en el
+YAML, ni se duplica el script de chequeo una vez por dirección.
+
+1. **El script "checker" es puro y booleano.** Solo responde "existe o
+   no" vía exit code (0 = sí, 1 = no) — no imprime mensajes de error de
+   negocio, no sabe si el llamador esperaba que existiera o no. Ej.:
+   `git-tag-exists.sh <tag>`, `docker-hub-tag-exists.sh <repo> <tag>`.
+
+2. **El script "assert" envuelve al checker y agrega el modo.** Recibe
+   `exists`/`not-exists` como primer argumento, llama al checker, y
+   recién ahí decide si eso es una falla — con el mensaje de error
+   específico para esa dirección. Ej.: `assert-git-tag-existence.sh
+   exists v1.0.0` vs. `assert-git-tag-existence.sh not-exists v1.0.0`.
+
+3. **El step del YAML queda en una sola línea**, sin `if`/`exit` visible:
+   ```yaml
+   run: .github/scripts/assert-git-tag-existence.sh not-exists "$NEW_TAG"
+   ```
+
+Esta separación evita dos problemas a la vez: reimplementar el mismo
+chequeo booleano dos veces (una por dirección), y ensuciar el YAML con
+lógica condicional que después hay que testear por separado del resto.
+
+## Disparar y esperar un workflow en otro repo
+
+`gh workflow run` es **fire-and-forget** — devuelve apenas GitHub
+acepta el pedido, no cuando el workflow disparado termina. Si un job
+siguiente depende de que ese otro workflow haya salido bien (no solo
+de que se haya disparado), hace falta un paso extra:
+
+1. **Guardar un timestamp UTC justo antes de disparar** (`date -u
+   +%Y-%m-%dT%H:%M:%SZ`), en su propio step. Sirve para encontrar el
+   run correcto después, sin agarrar por error uno viejo de otra
+   persona.
+
+2. **Buscar el run recién disparado filtrando por ese timestamp**, no
+   por "el último de la lista" a secas — `gh run list --json
+   databaseId,createdAt | jq '[.[] | select(.createdAt >= $since)] |
+   sort_by(.createdAt) | .[0].databaseId'`. Con reintentos cortos
+   (unos segundos entre cada uno): el run tarda un rato en aparecer
+   listado después del dispatch.
+
+3. **Bloquear con `gh run watch <id> --exit-status`** — esto sí espera
+   a que termine, y devuelve código de error si el run remoto falló.
+   Como vive en el mismo `run:` que hizo el dispatch, propaga la falla
+   al job actual: si el otro workflow falla, este job también queda en
+   rojo, y cualquier job siguiente que dependa de él (`needs:`) no
+   corre.
+
+4. **Retries/sleep parametrizables por variable de entorno**, con
+   default razonable en producción — así el test del script no tiene
+   que dormir de verdad para cubrir el caso "nunca aparece".
+
+## Visibilidad de dependencias entre workflows
+
+Cuando un job dispara y depende de un workflow en OTRO repo, la
+persona que lo mira tiene que enterarse de eso sin adivinar ni ir a
+buscar en los logs.
+
+1. **`::notice::` para un cartel visible en la corrida**, posteado
+   ANTES del step que bloquea esperando el resultado (no después) —
+   así se ve apenas arranca, y sigue estando si el wait termina
+   fallando:
+   ```bash
+   echo "::notice title=Título::Mensaje con el link: https://..."
+   ```
+
+2. **`environment: { name, url }` como segunda superficie**, no
+   reemplaza al notice — agrega un botón "View deployment" nativo de
+   GitHub, visible en la sección Environments del repo y en el grafo
+   del run. Confirmado con la API real: el `environment_url` queda
+   vacío mientras el job espera aprobación (`state: waiting`) — recién
+   se completa cuando el job termina de ejecutar, no antes.
+
+3. **El nodo del job en el grafo no soporta mensajes ni tooltips
+   custom** — solo nombre y estado. Ningún truco de YAML cambia eso;
+   `::notice::` y `environment.url` son los mecanismos reales que
+   GitHub expone, ninguno vive *dentro* del cuadradito del nodo.
+
 ## Nombramiento de scripts `.sh` y sus variables
 
 1. **Archivos: kebab-case, verbo primero** (`validate-`, `build-`,
@@ -153,6 +241,14 @@ en una sola línea.
 5. **`jq -n` necesita `-c` explícito si su salida va a `$GITHUB_ENV`.**
    Sin el flag, el pretty-print multilínea que trae por default rompe
    el formato `CLAVE=valor` de ese archivo.
+
+6. **`fetch-tags: true` solo no alcanza para validar tags de git.** Con
+   el `fetch-depth: 1` shallow por default, el checkout trae la
+   referencia del tag pero no necesariamente el objeto commit al que
+   apunta (si ese commit ya no es la punta de la rama). Un chequeo de
+   existencia contra un tag real puede dar falso negativo. Hace falta
+   `fetch-depth: 0` (historia completa) en el job que necesite
+   confiar en `git tag`/`git rev-parse` contra tags existentes.
 
 ## Por qué los manifests de Kubernetes no viven en el repo de la app
 
