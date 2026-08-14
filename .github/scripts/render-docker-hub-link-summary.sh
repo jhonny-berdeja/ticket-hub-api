@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Renders the "view tags in Docker Hub" link section of the
-# GITHUB_STEP_SUMMARY for cleanup-image-tags.yml. Prints Markdown to
+# GITHUB_STEP_SUMMARY for release-ticket-hub-api.yml. Prints Markdown to
 # stdout -- appending it to $GITHUB_STEP_SUMMARY is the caller's job
-# (in cleanup-image-tags.yml), not this script's.
+# (in release-ticket-hub-api.yml), not this script's.
 #
 # Usage: render-docker-hub-link-summary.sh <dockerhub-username>
 set -euo pipefail

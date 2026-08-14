@@ -3,7 +3,7 @@
 # body and prints the token from the response to stdout (unvalidated
 # -- the caller is responsible for checking it before trusting it).
 # Saving it to $GITHUB_ENV is the caller's job (in
-# cleanup-image-tags.yml), not this script's.
+# release-ticket-hub-api.yml), not this script's.
 #
 # Usage: call-docker-hub-api-login.sh <login-body-json>
 set -euo pipefail

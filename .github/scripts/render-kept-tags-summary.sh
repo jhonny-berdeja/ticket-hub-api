@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Renders the "kept tags" section of the GITHUB_STEP_SUMMARY for
-# cleanup-image-tags.yml: header, intro sentence, and the bullet list
+# release-ticket-hub-api.yml: header, intro sentence, and the bullet list
 # of kept tags. Prints Markdown to stdout -- appending it to
-# $GITHUB_STEP_SUMMARY is the caller's job (in cleanup-image-tags.yml),
+# $GITHUB_STEP_SUMMARY is the caller's job (in release-ticket-hub-api.yml),
 # not this script's.
 #
 # Usage: render-kept-tags-summary.sh <previous-stable-tag> <new-tag> <keep-tag-file>

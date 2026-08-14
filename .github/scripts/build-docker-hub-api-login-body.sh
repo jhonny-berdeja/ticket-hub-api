@@ -2,7 +2,7 @@
 # Builds the Docker Hub Hub API login request body
 # ({"username": "...", "password": "..."}) and prints it to stdout as
 # a single line. Saving it to $GITHUB_ENV is the caller's job (in
-# cleanup-image-tags.yml), not this script's.
+# release-ticket-hub-api.yml), not this script's.
 #
 # `jq -n` alone pretty-prints across multiple lines by default -- that
 # would break $GITHUB_ENV's KEY=VALUE format if the caller echoed this
