@@ -22,6 +22,7 @@ describe('buildLoggerOptions', () => {
         'res.headers["set-cookie"]',
         'req.body.password',
         'req.body.access_token',
+        'err.parameters',
       ]),
     );
   });
