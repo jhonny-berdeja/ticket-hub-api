@@ -13,6 +13,13 @@
   - `dto/` — solo formas de respuesta genéricas y reutilizables (p. ej.
     `ResponseBody<T>`). Los DTOs específicos de una funcionalidad NO van
     acá — ver más abajo.
+- `src/instrument/<concern>/` — infraestructura de *observability*, un
+  bucket a nivel raíz aparte de `common/`: cada `<concern>` (`logger/` hoy,
+  potencialmente `tracing/`, `metrics/` más adelante) es consumido de
+  forma implícita por *toda* la app, no infraestructura de dominio o
+  transversal que un módulo puntual podría o no necesitar. Mismo criterio
+  interno que `common/config/` — separar la construcción pura de opciones
+  (`logger.config.ts`) del wiring del módulo (`logger.module.ts`).
 - `src/modules/<funcionalidad>/` — una carpeta por funcionalidad de
   negocio (`auth`, `users`, ...). Cada una tiene:
   - `<funcionalidad>.module.ts`, `<funcionalidad>.controller.ts`,

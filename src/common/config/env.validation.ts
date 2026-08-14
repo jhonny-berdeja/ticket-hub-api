@@ -1,10 +1,21 @@
 import { plainToInstance } from 'class-transformer';
 import {
+  IsIn,
   IsNotEmpty,
   IsNumberString,
   IsString,
   validateSync,
 } from 'class-validator';
+
+/** Valid pino log levels, in ascending severity order. */
+const PINO_LOG_LEVELS = [
+  'trace',
+  'debug',
+  'info',
+  'warn',
+  'error',
+  'fatal',
+] as const;
 
 /**
  * Every container env var the app needs, all mandatory. `DATABASE_PORT`/
@@ -38,6 +49,9 @@ export class EnvironmentVariables {
 
   @IsNumberString()
   PORT!: string;
+
+  @IsIn(PINO_LOG_LEVELS)
+  LOG_LEVEL!: string;
 }
 
 /**

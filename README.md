@@ -42,6 +42,7 @@ at boot if any is missing).
 | `DATABASE_NAME` | Yes | literal `env:` → `ticket-hub-db` | Database name |
 | `JWT_SECRET` | Yes | `secretRef: ticket-hub-api-credentials` | Secret used to sign/verify login JWTs (1h expiry) |
 | `PORT` | Yes | literal `env:` → `3000` | HTTP port the Nest app listens on |
+| `LOG_LEVEL` | Yes | literal `env:` → `info` | Minimum pino log level (`trace`/`debug`/`info`/`warn`/`error`/`fatal`) |
 
 `ticket-hub-api-credentials` does not exist yet — creating it in-cluster is
 one of the manual setup steps for the `infra-hub` deploy pipeline (see
@@ -82,7 +83,7 @@ Both `ticket-hub-db-...` and `ticket-hub-api-...` should show `Running`. The
 API log should show Nest's normal route map at boot (`Mapped {/users, POST}`,
 `Mapped {/auth/login, POST}`) with no `Missing required environment
 variable(s)` error — if that error appears, the Deployment/Secret wiring is
-missing one of the 7 vars in the table above.
+missing one of the 8 vars in the table above.
 
 ### 2. Exercise `POST /users` and `POST /auth/login` directly against the API
 
