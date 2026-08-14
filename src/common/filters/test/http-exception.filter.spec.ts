@@ -1,7 +1,7 @@
 import { ArgumentsHost, ConflictException } from '@nestjs/common';
 import { InternalServerErrorException } from '@nestjs/common';
 import { Logger } from 'nestjs-pino';
-import { HttpExceptionFilter } from './http-exception.filter';
+import { HttpExceptionFilter } from '../http-exception.filter';
 
 function buildHost(response: {
   status: jest.Mock;
