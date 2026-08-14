@@ -5,11 +5,19 @@ import { UsersModule } from './modules/users/users.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { EnvModule } from './common/config/env.module';
 import { DatabaseModule } from './common/database/database.module';
+import { LoggerModule } from './instrument/logger/logger.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 
 @Module({
-  imports: [EnvModule, DatabaseModule, UsersModule, AuthModule, TicketsModule],
+  imports: [
+    EnvModule,
+    LoggerModule,
+    DatabaseModule,
+    UsersModule,
+    AuthModule,
+    TicketsModule,
+  ],
   providers: [
     // Global, in this order: JwtAuthGuard authenticates every request by
     // default (the only exception is @Public(), used solely by
