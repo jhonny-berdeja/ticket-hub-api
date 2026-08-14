@@ -20,7 +20,6 @@ export class DatabaseExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
 
     this.logger.error({
-
       err: {
         message: exception.message,
         stack: exception.stack,
