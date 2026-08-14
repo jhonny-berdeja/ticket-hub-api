@@ -1,7 +1,7 @@
 import { ArgumentsHost } from '@nestjs/common';
 import { Logger } from 'nestjs-pino';
 import { QueryFailedError } from 'typeorm';
-import { DatabaseExceptionFilter } from './database-exception.filter';
+import { DatabaseExceptionFilter } from '../database-exception.filter';
 
 function buildHost(response: {
   status: jest.Mock;
