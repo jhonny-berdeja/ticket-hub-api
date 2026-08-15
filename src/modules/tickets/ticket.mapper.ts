@@ -20,7 +20,7 @@ export class TicketMapper {
       .withSubject(dto.subject)
       .withStatus(TicketStatus.CREATED)
       .withDescription(dto.description)
-      .withCodeAnsible(dto.codeAnsible ?? null)
+      .withCodeAnsible(dto.codeAnsible)
       .build();
   }
 
@@ -35,6 +35,7 @@ export class TicketMapper {
       status: ticket.status,
       description: ticket.description,
       codeAnsible: ticket.codeAnsible,
+      response: ticket.response,
     };
   }
 }

@@ -52,6 +52,28 @@ export class EnvironmentVariables {
 
   @IsIn(PINO_LOG_LEVELS)
   LOG_LEVEL!: string;
+
+  /**
+   * Base URL of pcbox-api's `POST /pcbox`, e.g.
+   * `http://pcbox-api.pcbox-api.svc.cluster.local:3000` — in-cluster
+   * DNS, never a public address. Not `@IsUrl()`: that validator requires
+   * a public-looking TLD and rejects `*.svc.cluster.local` hostnames.
+   */
+  @IsString()
+  @IsNotEmpty()
+  PCBOX_API_URL!: string;
+
+  /**
+   * Shared secret sent as `x-admin-api-key` when calling pcbox-api —
+   * must hold the exact same value as pcbox-api's own `ADMIN_API_KEY`.
+   * Provisioned as a separate Secret in this namespace (Kubernetes
+   * Secrets don't cross namespaces) — see pcbox-api's own
+   * documentation/pcbox.ticket-hub-db-deploy.md, step 9 (deploy docs for
+   * the whole ecosystem live in that repo, not here).
+   */
+  @IsString()
+  @IsNotEmpty()
+  PCBOX_API_ADMIN_KEY!: string;
 }
 
 /**

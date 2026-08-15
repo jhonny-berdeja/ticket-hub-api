@@ -8,9 +8,21 @@ import { Role } from '../../../src/common/database/role/role.enum';
 import { bootstrapTestApp } from '../../common/bootstrap-test-app';
 import { seedAuthenticatedUser } from '../../common/seed-authenticated-user';
 
+function pcboxApiSuccessResponse(): Response {
+  return new Response(
+    JSON.stringify({
+      msg: 'Administration saved and playbook execution finished',
+      data: { execution: { success: true, exitCode: 0 } },
+    }),
+    { status: 201 },
+  );
+}
+
 /**
  * Real end-to-end: real `TicketsModule`/`UsersModule` against a real —
- * if in-memory — database. No mocked repository or service.
+ * if in-memory — database. Only `fetch` is mocked, the one external
+ * boundary that cannot run in this environment at all: `ApproveTicketService`
+ * calls the real pcbox-api right after approval (see `PcboxApiService`).
  */
 describe('Tickets flow (e2e, in-memory DB)', () => {
   let app: INestApplication<App>;
@@ -18,6 +30,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
   let devToken: string;
   let otherDevToken: string;
   let approverToken: string;
+  let fetchSpy: jest.SpiedFunction<typeof fetch>;
 
   const validTicketBody = () => ({
     assignee: 1, // the seeded APPROVER is always created first, id 1
@@ -28,6 +41,9 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
   });
 
   beforeAll(async () => {
+    process.env.PCBOX_API_URL = 'http://pcbox-api.test';
+    process.env.PCBOX_API_ADMIN_KEY = 'test-pcbox-admin-key';
+
     ({ app, moduleFixture } = await bootstrapTestApp([
       UsersModule,
       TicketsModule,
@@ -58,6 +74,14 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
 
   afterAll(async () => {
     await app.close();
+  });
+
+  beforeEach(() => {
+    fetchSpy = jest.spyOn(globalThis, 'fetch');
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
   });
 
   it('rejects ticket creation from a non-DEV', async () => {
@@ -95,8 +119,10 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
         status: 'CREATED',
         description: 'El servidor de prod no responde',
         codeAnsible: 'playbook: restart.yml',
+        response: null,
       },
     });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('DEV sees only their own tickets; APPROVER sees every ticket', async () => {
@@ -151,14 +177,56 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
       .expect(403);
   });
 
-  it('happy path: APPROVER approves a ticket', async () => {
+  it('happy path: APPROVER approves a ticket, and pcbox-api gets notified', async () => {
+    fetchSpy.mockResolvedValue(pcboxApiSuccessResponse());
+
     const response = await request(app.getHttpServer())
       .patch('/tickets/1/approve')
       .set('Authorization', `Bearer ${approverToken}`)
       .expect(200);
 
-    const body = response.body as { data: { status: string } };
+    const body = response.body as {
+      data: { status: string; response: string | null };
+    };
     expect(body.data.status).toBe('APPROVED');
+    expect(body.data.response).toBe(
+      'Administration saved and playbook execution finished (execution: success=true, exitCode=0)',
+    );
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://pcbox-api.test/pcbox',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'x-admin-api-key': 'test-pcbox-admin-key',
+        }) as unknown,
+        body: JSON.stringify({
+          ticketNumber: 1,
+          department: 'Datacenter',
+          // seedAuthenticatedUser hardcodes name: 'Seed' for every user
+          // it creates, creator and assignee both resolve to it here.
+          informer: 'Seed',
+          approver: 'Seed',
+          status: 'APPROVED',
+          fileContent: 'playbook: restart.yml',
+        }),
+      }) as unknown,
+    );
+  });
+
+  it('approval still succeeds even when pcbox-api is unreachable — the failure just lands in response', async () => {
+    fetchSpy.mockRejectedValue(new Error('ECONNREFUSED'));
+
+    const response = await request(app.getHttpServer())
+      .patch('/tickets/2/approve')
+      .set('Authorization', `Bearer ${approverToken}`)
+      .expect(200);
+
+    const body = response.body as {
+      data: { status: string; response: string | null };
+    };
+    expect(body.data.status).toBe('APPROVED');
+    expect(body.data.response).toBe('pcbox-api unreachable: ECONNREFUSED');
   });
 
   it('404s approving a ticket that does not exist', async () => {
@@ -166,5 +234,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
       .patch('/tickets/999/approve')
       .set('Authorization', `Bearer ${approverToken}`)
       .expect(404);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

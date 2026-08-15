@@ -43,10 +43,13 @@ at boot if any is missing).
 | `JWT_SECRET` | Yes | `secretRef: ticket-hub-api-credentials` | Secret used to sign/verify login JWTs (1h expiry) |
 | `PORT` | Yes | literal `env:` → `3000` | HTTP port the Nest app listens on |
 | `LOG_LEVEL` | Yes | literal `env:` → `info` | Minimum pino log level (`trace`/`debug`/`info`/`warn`/`error`/`fatal`) |
+| `PCBOX_API_URL` | Yes | literal `env:` → `http://pcbox-api.pcbox-api.svc.cluster.local:3000` | Base URL of pcbox-api, called by `ApproveTicketService` right after a ticket is approved |
+| `PCBOX_API_ADMIN_KEY` | Yes | `secretRef: pcbox-api-notification-credentials` | Shared secret sent as `x-admin-api-key` — must match pcbox-api's own `ADMIN_API_KEY` |
 
-`ticket-hub-api-credentials` does not exist yet — creating it in-cluster is
-one of the manual setup steps for the `infra-hub` deploy pipeline (see
-`infra-hub/apps/ticket-hub-api/`).
+`ticket-hub-api-credentials` and `pcbox-api-notification-credentials` do not
+exist yet — creating them in-cluster is one of the manual setup steps for the
+`infra-hub` deploy pipeline (see `infra-hub/apps/ticket-hub-api/` and
+pcbox-api's `documentation/pcbox.ticket-hub-db-deploy.md`, step 9).
 
 ## Manual verification (once deployed in-cluster)
 

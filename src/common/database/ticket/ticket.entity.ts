@@ -55,6 +55,21 @@ export class TicketEntity {
   })
   codeAnsible!: string | null;
 
+  /**
+   * pcbox-api's summarized answer to the `POST /pcbox` call
+   * `ApproveTicketService` makes right after approval — never the full
+   * stdout/stderr (pcbox-api itself never returns those, see its own
+   * PcboxController comment), just `msg` + the execution outcome, or a
+   * failure description if that call didn't go through. `null` until a
+   * ticket is actually approved — same "business-mandatory, DB-nullable"
+   * reasoning as `codeAnsible` becoming mandatory at the DTO level
+   * without a NOT NULL here (see CreateTicketDto's own comment): adding
+   * NOT NULL later would need a migration for every row that predates
+   * this column, this way it doesn't.
+   */
+  @Column({ type: 'varchar', length: 600, nullable: true })
+  response!: string | null;
+
   static builder(): TicketEntityBuilder {
     return new TicketEntityBuilder();
   }
@@ -70,6 +85,7 @@ export class TicketEntityBuilder {
   private status?: TicketStatus;
   private description?: string;
   private codeAnsible: string | null = null;
+  private response: string | null = null;
 
   withNumber(number: number): this {
     this.number = number;
@@ -111,6 +127,11 @@ export class TicketEntityBuilder {
     return this;
   }
 
+  withResponse(response: string | null): this {
+    this.response = response;
+    return this;
+  }
+
   build(): TicketEntity {
     if (this.number === undefined) {
       throw new Error('TicketEntity.Builder: number is required');
@@ -140,6 +161,7 @@ export class TicketEntityBuilder {
     entity.status = this.status;
     entity.description = this.description;
     entity.codeAnsible = this.codeAnsible;
+    entity.response = this.response;
     return entity;
   }
 }
