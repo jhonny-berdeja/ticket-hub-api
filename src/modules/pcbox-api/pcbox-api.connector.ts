@@ -26,7 +26,15 @@ export interface PcboxApiCreateAdministrationBody {
  */
 @Injectable()
 export class PcboxApiConnector {
-  private static readonly REQUEST_TIMEOUT_MS = 5_000;
+  // POST /pcbox doesn't respond until the whole playbook run finishes —
+  // pcbox-api's own AnsibleConnector allows up to 120s for that
+  // (PLAYBOOK_TIMEOUT_MS). This has to be at least that long plus some
+  // margin for network/processing overhead, or every real playbook run
+  // gets aborted here before pcbox-api ever gets to answer — found the
+  // hard way: a short playbook still timed out at the old 5s value,
+  // landing "pcbox-api unreachable: This operation was aborted" in
+  // every ticket's `response`, every time.
+  private static readonly REQUEST_TIMEOUT_MS = 130_000;
   private static readonly API_KEY_HEADER = 'x-admin-api-key';
 
   constructor(private readonly configService: ConfigService) {}
