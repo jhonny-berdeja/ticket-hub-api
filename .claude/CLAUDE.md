@@ -125,3 +125,10 @@ las variables de entorno requeridas (todas obligatorias, validadas con
 `class-validator`). Cualquier variable que se agregue, quite o renombre
 ahí debe reflejarse tanto en `.env.example` como en la tabla del
 `README.md` — las tres nunca deben desincronizarse.
+
+`pcbox-api` no consume esta API — hubo una integración (login como cuenta
+de servicio + `GET /tickets/by-number/:number` + `GET /users`, para
+validar un ticket antes de ejecutar un playbook) que se sacó por completo
+del lado de `pcbox-api`. No hay, ni hubo nunca, ningún endpoint ni guard
+especial para llamadas machine-to-machine en este repo — cualquier
+consumidor externo futuro se autenticaría igual que un usuario humano.
