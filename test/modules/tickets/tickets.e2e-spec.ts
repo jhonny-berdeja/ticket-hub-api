@@ -12,7 +12,14 @@ function pcboxApiSuccessResponse(): Response {
   return new Response(
     JSON.stringify({
       msg: 'Administration saved and playbook execution finished',
-      data: { execution: { success: true, exitCode: 0 } },
+      data: {
+        execution: {
+          success: true,
+          exitCode: 0,
+          stdout: 'PLAY [all] ***',
+          stderr: '',
+        },
+      },
     }),
     { status: 201 },
   );
@@ -190,7 +197,13 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     };
     expect(body.data.status).toBe('APPROVED');
     expect(body.data.response).toBe(
-      'Administration saved and playbook execution finished (execution: success=true, exitCode=0)',
+      [
+        'Administration saved and playbook execution finished (execution: success=true, exitCode=0)',
+        '--- stdout ---',
+        'PLAY [all] ***',
+        '--- stderr ---',
+        '',
+      ].join('\n'),
     );
 
     expect(fetchSpy).toHaveBeenCalledWith(

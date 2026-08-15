@@ -6,14 +6,18 @@ import {
   PcboxApiCreateAdministrationBody,
 } from './pcbox-api.connector';
 
-const RESPONSE_MAX_LENGTH = 600;
 const UNRESOLVED_NAMES_MESSAGE =
   'pcbox-api not notified: could not resolve creator/assignee name';
 
 interface PcboxApiSuccessBody {
   msg: string;
   data: {
-    execution: { success: boolean; exitCode: number | null };
+    execution: {
+      success: boolean;
+      exitCode: number | null;
+      stdout: string;
+      stderr: string;
+    };
   };
 }
 
@@ -24,11 +28,13 @@ interface PcboxApiErrorBody {
 /**
  * Owns the *decision* around notifying pcbox-api once a ticket is
  * approved: who `informer`/`approver` resolve to, what to send, and how
- * to turn whatever comes back into the short string that ends up in
- * `TicketEntity.response` — never a thrown exception, since a failed
- * notification must never block the approval itself (confirmed product
- * decision, see `ApproveTicketService`). `PcboxApiConnector` owns only
- * the HTTP mechanics (see its own comment).
+ * to turn whatever comes back into the string that ends up in
+ * `TicketEntity.response` — the complete `msg` + execution outcome +
+ * stdout/stderr on success, a failure description otherwise. Never a
+ * thrown exception, since a failed notification must never block the
+ * approval itself (confirmed product decision, see
+ * `ApproveTicketService`). `PcboxApiConnector` owns only the HTTP
+ * mechanics (see its own comment).
  *
  * `department` is sent as-is even though `tickets.department` allows up
  * to 25 characters and pcbox-api's own `CreatePcboxDto.department` caps
@@ -57,7 +63,7 @@ export class PcboxApiService {
       return await this.describeResponse(response);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return this.truncate(`pcbox-api unreachable: ${message}`);
+      return `pcbox-api unreachable: ${message}`;
     }
   }
 
@@ -89,16 +95,18 @@ export class PcboxApiService {
   private async describeResponse(response: Response): Promise<string> {
     if (response.status === 201) {
       const body = (await response.json()) as PcboxApiSuccessBody;
-      const { success, exitCode } = body.data.execution;
-      return this.truncate(
+      const { success, exitCode, stdout, stderr } = body.data.execution;
+      return [
         `${body.msg} (execution: success=${success}, exitCode=${exitCode})`,
-      );
+        '--- stdout ---',
+        stdout,
+        '--- stderr ---',
+        stderr,
+      ].join('\n');
     }
 
     const message = await this.extractErrorMessage(response);
-    return this.truncate(
-      `pcbox-api request failed with status ${response.status}${message ? `: ${message}` : ''}`,
-    );
+    return `pcbox-api request failed with status ${response.status}${message ? `: ${message}` : ''}`;
   }
 
   /** Best-effort — an unparseable/missing body just means the status-only message above is all we get. */
@@ -113,9 +121,5 @@ export class PcboxApiService {
     } catch {
       return null;
     }
-  }
-
-  private truncate(text: string): string {
-    return text.slice(0, RESPONSE_MAX_LENGTH);
   }
 }
