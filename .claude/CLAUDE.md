@@ -21,14 +21,17 @@
   interno que `common/config/` — separar la construcción pura de opciones
   (`logger.config.ts`) del wiring del módulo (`logger.module.ts`).
 - `src/modules/<funcionalidad>/` — una carpeta por funcionalidad de
-  negocio (`auth`, `users`, ...). Cada una tiene:
-  - `<funcionalidad>.module.ts`, `<funcionalidad>.controller.ts`,
-    `<funcionalidad>.service.ts`
+  negocio (`auth`, `users`, `tickets`, ...). Cada una con controller
+  tiene `<funcionalidad>.module.ts`, `<funcionalidad>.controller.ts`,
+  `<funcionalidad>.service.ts`
   - `dto/` — DTOs específicos del contrato HTTP de esa funcionalidad:
     tanto de request (`CreateUserDto`) como de response (`ResponseLogin`).
   - mappers (`<entidad>.mapper.ts`) y value objects internos que nunca
     cruzan el límite HTTP tal cual (`payload-jwt.ts`) van sueltos en la
     raíz del módulo, no dentro de `dto/`.
+  - Un módulo que solo habla con un servicio externo, sin exponer nada
+    por HTTP (`pcbox-api/` hoy), no tiene controller — ver "Patrón
+    connector vs. service" más abajo.
 - `test/` espeja a `src/`:
   - `test/common/` — infraestructura de test compartida (módulo de DB en
     memoria, helper de bootstrap de la app). Nada específico de una
@@ -118,6 +121,29 @@ El objetivo es que revisar un handler simple no obligue a leer el
 archivo general completo, y que un handler con lógica auxiliar propia
 quede aislado en un archivo chico y fácil de revisar solo.
 
+## Patrón "connector vs. service" (para módulos que solo hablan con algo externo)
+
+Un módulo cuyo único trabajo es hablarle a un servicio externo, sin
+exponer nada por HTTP propio (`pcbox-api/` hoy — le pega a la API real de
+`pcbox-api` el otro repo, nombre igual pero cosas distintas), repite el
+mismo split que ya usa `pcbox-api` (el repo) para sus propios módulos
+`ansible/`/`ticket-hub-api/`: un `<Módulo>Connector` que es pura mecánica
+de I/O (arma la URL, el header del secreto, el timeout, no decide nada
+de negocio) y un `<Módulo>Service` que es la API pública del módulo —
+decide *qué* mandar y *qué significa* la respuesta, nunca hace el I/O él
+mismo.
+
+- `PcboxApiConnector` — arma la URL completa, adjunta `x-admin-api-key`,
+  aplica el timeout, devuelve el `Response` crudo o rechaza.
+  `PcboxApiService` decide qué campos mandar (resolviendo
+  `creator`/`assignee` a nombres vía `UsersRepository`, sin ningún
+  round-trip HTTP — esta app tiene acceso directo a esa tabla) y qué
+  hacer con la respuesta.
+
+El connector es siempre provider del módulo pero **nunca exportado** —
+solo el service lo es (ver `PcboxApiModule`). Nada fuera del módulo toca
+el connector directo.
+
 ## Variables de entorno
 
 `src/common/config/env.validation.ts` es la única fuente de verdad para
@@ -126,9 +152,15 @@ las variables de entorno requeridas (todas obligatorias, validadas con
 ahí debe reflejarse tanto en `.env.example` como en la tabla del
 `README.md` — las tres nunca deben desincronizarse.
 
-`pcbox-api` no consume esta API — hubo una integración (login como cuenta
-de servicio + `GET /tickets/by-number/:number` + `GET /users`, para
-validar un ticket antes de ejecutar un playbook) que se sacó por completo
-del lado de `pcbox-api`. No hay, ni hubo nunca, ningún endpoint ni guard
-especial para llamadas machine-to-machine en este repo — cualquier
-consumidor externo futuro se autenticaría igual que un usuario humano.
+`ticket-hub-api` le habla a pcbox-api, no al revés: `ApproveTicketService`
+llama a `PcboxApiService.notifyApproval` justo después de persistir el
+`status = APPROVED` de un ticket, y el resultado (un resumen de éxito o
+una descripción de la falla, nunca el stdout/stderr completo) se guarda
+en `TicketEntity.response`. Esa llamada nunca hace fallar la aprobación
+en sí — es una decisión de negocio independiente de si la ejecución
+técnica funcionó (confirmado). Se autentica con un secreto compartido
+(`x-admin-api-key`/`PCBOX_API_ADMIN_KEY`), no con login — esta app no
+tiene cuenta de usuario en pcbox-api, y pcbox-api no tiene login para
+nadie, solo ese secreto (ver su propio `AdminApiKeyGuard`). Ya no hay,
+ni hubo nunca, ningún endpoint ni guard especial en *este* repo para
+llamadas machine-to-machine entrantes — solo esta llamada saliente.

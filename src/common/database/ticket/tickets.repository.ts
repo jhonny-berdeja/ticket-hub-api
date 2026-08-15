@@ -48,4 +48,16 @@ export class TicketsRepository {
     }
     return updated;
   }
+
+  /** Same re-read reasoning as `updateStatus`. Called once, right after approval, with pcbox-api's summarized answer (or a failure description) — see `ApproveTicketService`/`PcboxApiService`. */
+  async updateResponse(id: number, response: string): Promise<TicketEntity> {
+    await this.repository.update(id, { response });
+    const updated = await this.findById(id);
+    if (!updated) {
+      throw new Error(
+        `updateResponse: ticket ${id} vanished immediately after update`,
+      );
+    }
+    return updated;
+  }
 }

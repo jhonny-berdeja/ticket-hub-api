@@ -11,4 +11,5 @@ export interface TicketResponse {
   status: TicketStatus;
   description: string;
   codeAnsible: string | null;
+  response: string | null;
 }
