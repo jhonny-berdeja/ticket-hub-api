@@ -56,18 +56,19 @@ export class TicketEntity {
   codeAnsible!: string | null;
 
   /**
-   * pcbox-api's summarized answer to the `POST /pcbox` call
-   * `ApproveTicketService` makes right after approval — never the full
-   * stdout/stderr (pcbox-api itself never returns those, see its own
-   * PcboxController comment), just `msg` + the execution outcome, or a
-   * failure description if that call didn't go through. `null` until a
-   * ticket is actually approved — same "business-mandatory, DB-nullable"
-   * reasoning as `codeAnsible` becoming mandatory at the DTO level
-   * without a NOT NULL here (see CreateTicketDto's own comment): adding
-   * NOT NULL later would need a migration for every row that predates
-   * this column, this way it doesn't.
+   * pcbox-api's full answer to the `POST /pcbox` call
+   * `ApproveTicketService` makes right after approval — `msg` + the
+   * execution outcome + the complete stdout/stderr, or a failure
+   * description if that call didn't go through. `text`, not a bounded
+   * `varchar`: a playbook's stdout has no predictable upper bound.
+   * `null` until a ticket is actually approved — same
+   * "business-mandatory, DB-nullable" reasoning as `codeAnsible`
+   * becoming mandatory at the DTO level without a NOT NULL here (see
+   * CreateTicketDto's own comment): adding NOT NULL later would need a
+   * migration for every row that predates this column, this way it
+   * doesn't.
    */
-  @Column({ type: 'varchar', length: 600, nullable: true })
+  @Column({ type: 'text', nullable: true })
   response!: string | null;
 
   static builder(): TicketEntityBuilder {

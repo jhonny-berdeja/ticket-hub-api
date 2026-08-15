@@ -61,12 +61,19 @@ describe('PcboxApiService', () => {
     };
   }
 
-  it('resolves creator/assignee names and sends them as informer/approver', async () => {
+  it('resolves creator/assignee names, sends them as informer/approver, and returns the full execution output', async () => {
     const createAdministration = jest.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
           msg: 'Administration saved and playbook execution finished',
-          data: { execution: { success: true, exitCode: 0 } },
+          data: {
+            execution: {
+              success: true,
+              exitCode: 0,
+              stdout: 'PLAY [all] ***',
+              stderr: '',
+            },
+          },
         }),
         { status: 201 },
       ),
@@ -84,7 +91,13 @@ describe('PcboxApiService', () => {
       fileContent: '- hosts: all\n  tasks: []\n',
     });
     expect(result).toBe(
-      'Administration saved and playbook execution finished (execution: success=true, exitCode=0)',
+      [
+        'Administration saved and playbook execution finished (execution: success=true, exitCode=0)',
+        '--- stdout ---',
+        'PLAY [all] ***',
+        '--- stderr ---',
+        '',
+      ].join('\n'),
     );
   });
 
@@ -152,16 +165,28 @@ describe('PcboxApiService', () => {
     );
   });
 
-  it('truncates the returned string to 600 characters', async () => {
+  it('never truncates — a long stdout comes back in full', async () => {
+    const longStdout = 'x'.repeat(5000);
     const createAdministration = jest.fn().mockResolvedValue(
-      new Response(JSON.stringify({ message: 'x'.repeat(1000) }), {
-        status: 400,
-      }),
+      new Response(
+        JSON.stringify({
+          msg: 'Administration saved and playbook execution finished',
+          data: {
+            execution: {
+              success: true,
+              exitCode: 0,
+              stdout: longStdout,
+              stderr: '',
+            },
+          },
+        }),
+        { status: 201 },
+      ),
     );
     const { service } = buildService({ createAdministration });
 
     const result = await service.notifyApproval(buildTicket());
 
-    expect(result.length).toBe(600);
+    expect(result).toContain(longStdout);
   });
 });

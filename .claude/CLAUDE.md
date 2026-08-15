@@ -154,8 +154,9 @@ ahí debe reflejarse tanto en `.env.example` como en la tabla del
 
 `ticket-hub-api` le habla a pcbox-api, no al revés: `ApproveTicketService`
 llama a `PcboxApiService.notifyApproval` justo después de persistir el
-`status = APPROVED` de un ticket, y el resultado (un resumen de éxito o
-una descripción de la falla, nunca el stdout/stderr completo) se guarda
+`status = APPROVED` de un ticket, y el resultado (la respuesta completa
+de pcbox-api, con `stdout`/`stderr` incluidos, o una descripción de la
+falla si la llamada no llegó a buen puerto) se guarda
 en `TicketEntity.response`. Esa llamada nunca hace fallar la aprobación
 en sí — es una decisión de negocio independiente de si la ejecución
 técnica funcionó (confirmado). Se autentica con un secreto compartido
