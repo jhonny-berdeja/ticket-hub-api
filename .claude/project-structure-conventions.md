@@ -151,17 +151,3 @@ las variables de entorno requeridas (todas obligatorias, validadas con
 `class-validator`). Cualquier variable que se agregue, quite o renombre
 ahí debe reflejarse tanto en `.env.example` como en la tabla del
 `README.md` — las tres nunca deben desincronizarse.
-
-`ticket-hub-api` le habla a pcbox-api, no al revés: `ApproveTicketService`
-llama a `PcboxApiService.notifyApproval` justo después de persistir el
-`status = APPROVED` de un ticket, y el resultado (la respuesta completa
-de pcbox-api, con `stdout`/`stderr` incluidos, o una descripción de la
-falla si la llamada no llegó a buen puerto) se guarda
-en `TicketEntity.response`. Esa llamada nunca hace fallar la aprobación
-en sí — es una decisión de negocio independiente de si la ejecución
-técnica funcionó (confirmado). Se autentica con un secreto compartido
-(`x-admin-api-key`/`PCBOX_API_ADMIN_KEY`), no con login — esta app no
-tiene cuenta de usuario en pcbox-api, y pcbox-api no tiene login para
-nadie, solo ese secreto (ver su propio `AdminApiKeyGuard`). Ya no hay,
-ni hubo nunca, ningún endpoint ni guard especial en *este* repo para
-llamadas machine-to-machine entrantes — solo esta llamada saliente.
