@@ -8,7 +8,9 @@ import { APP_GUARD } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { App } from 'supertest/types';
 import { InMemoryDatabaseModule } from './in-memory-database.module';
+import { JwksClientServiceStub } from './jwks-client-service.stub';
 import { AuthModule } from '../../src/modules/auth/auth.module';
+import { JwksClientService } from '../../src/modules/auth/jwks-client.service';
 import { JwtAuthGuard } from '../../src/modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../src/modules/auth/guards/roles.guard';
 
@@ -31,13 +33,19 @@ export interface TestApp {
  *
  * AuthModule is always added to `imports` here too, even if the caller
  * already passes it (Nest dedupes re-imports of the same module, so
- * that's harmless): JwtAuthGuard depends on JwtService, which only
- * AuthModule provides, and the APP_GUARD providers above are registered
- * at THIS root testing module - a caller that only needs `[UsersModule]`
- * (which imports AuthModule internally, but doesn't re-export it) would
- * otherwise leave JwtService unresolvable at the root, the same
- * cross-module-boundary issue AuthModule itself hit re-exporting
- * jwtModule for @UseGuards(JwtAuthGuard) - see auth.module.ts.
+ * that's harmless): JwtAuthGuard depends on JwksClientService, which
+ * only AuthModule provides, and the APP_GUARD providers above are
+ * registered at THIS root testing module - a caller that only needs
+ * `[UsersModule]` (which imports AuthModule internally, but doesn't
+ * re-export it) would otherwise leave JwksClientService unresolvable at
+ * the root, the same cross-module-boundary issue AuthModule itself hit
+ * re-exporting its guards - see auth.module.ts.
+ *
+ * `JwksClientService` is overridden with a stub that hands back a fixed
+ * test key synchronously -- there's no real auth-api at `AUTH_API_URL`
+ * to poll here, and `seed-authenticated-user.ts` signs test tokens
+ * against that same test key instead of going through the (now-dead,
+ * see auth.controller.ts's comment) `/auth/login`.
  *
  * Returns `moduleFixture` too so specs that need to seed data through a real
  * service (see `test/modules/auth/auth.e2e-spec.ts`) can `.get()` it.
@@ -58,7 +66,10 @@ export async function bootstrapTestApp(
       { provide: APP_GUARD, useClass: JwtAuthGuard },
       { provide: APP_GUARD, useClass: RolesGuard },
     ],
-  }).compile();
+  })
+    .overrideProvider(JwksClientService)
+    .useClass(JwksClientServiceStub)
+    .compile();
 
   const app = moduleFixture.createNestApplication<INestApplication<App>>();
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));

@@ -12,7 +12,7 @@ import {
 import { Roles } from '../auth/guards/roles.decorator';
 import { Role } from '../../common/database/role/role.enum';
 import { CurrentUser } from '../auth/guards/current-user.decorator';
-import { PayloadJwt } from '../auth/payload-jwt';
+import type { AuthenticatedUser } from '../auth/authenticated-user';
 import { ResponseBody } from '../../common/dto/response-body.dto';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { TicketsService } from './tickets.service';
@@ -37,7 +37,7 @@ export class TicketsController {
   @HttpCode(HttpStatus.CREATED)
   create(
     @Body() dto: CreateTicketDto,
-    @CurrentUser() user: PayloadJwt,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse>> {
     return this.ticketsService.create(dto, user.sub);
   }
@@ -51,7 +51,7 @@ export class TicketsController {
    */
   @Get()
   findMineOrAll(
-    @CurrentUser() user: PayloadJwt,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse[]>> {
     return this.ticketsService.findMineOrAll(user);
   }
@@ -60,7 +60,7 @@ export class TicketsController {
   @Get('by-number/:number')
   findByNumber(
     @Param('number', ParseIntPipe) number: number,
-    @CurrentUser() user: PayloadJwt,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse>> {
     return this.ticketsService.findByNumber(number, user);
   }

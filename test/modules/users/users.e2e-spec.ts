@@ -22,17 +22,13 @@ describe('Users flow (e2e, in-memory DB)', () => {
     ({ app, moduleFixture } = await bootstrapTestApp([UsersModule]));
 
     adminToken = await seedAuthenticatedUser(
-      app,
       moduleFixture,
       'admin@example.com',
       [Role.ADMIN],
     );
-    devToken = await seedAuthenticatedUser(
-      app,
-      moduleFixture,
-      'dev@example.com',
-      [Role.DEV],
-    );
+    devToken = await seedAuthenticatedUser(moduleFixture, 'dev@example.com', [
+      Role.DEV,
+    ]);
   });
 
   afterAll(async () => {

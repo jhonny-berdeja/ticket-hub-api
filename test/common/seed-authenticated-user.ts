@@ -1,20 +1,26 @@
-import { INestApplication } from '@nestjs/common';
 import { TestingModule } from '@nestjs/testing';
-import request from 'supertest';
-import { App } from 'supertest/types';
+import * as jwt from 'jsonwebtoken';
 import { Role } from '../../src/common/database/role/role.enum';
 import { UsersService } from '../../src/modules/users/users.service';
+import { TEST_KID, TEST_PRIVATE_KEY } from './test-jwt-keys';
+
+const TICKET_HUB_APPLICATION = {
+  id: 1,
+  name: 'ticket-hub',
+  description: 'Ticket Hub',
+};
 
 /**
  * Seeds a user directly through the real `UsersService` (bypassing the
  * `POST /users` guard entirely, since this is a plain method call, not
- * an HTTP request) with the given roles, then logs in over real HTTP to
- * get a genuine, signed bearer token — the same two-step shape
- * `auth.e2e-spec.ts` already used, extracted so `users.e2e-spec.ts` can
- * reuse it for both ADMIN and non-ADMIN callers.
+ * an HTTP request), then signs an auth-api-shaped token directly with
+ * the test RSA key -- NOT via `POST /auth/login` anymore, since that
+ * route now issues a locally-signed token `JwtAuthGuard` won't accept
+ * (see `auth.controller.ts`'s comment). `sub` is fabricated (the local
+ * `UsersService.create` return value isn't needed by any of these
+ * callers today) rather than round-tripped through the DB.
  */
 export async function seedAuthenticatedUser(
-  app: INestApplication<App>,
   moduleFixture: TestingModule,
   email: string,
   roles: Role[],
@@ -22,7 +28,7 @@ export async function seedAuthenticatedUser(
   const password = 'secret1';
 
   const usersService = moduleFixture.get(UsersService);
-  await usersService.create({
+  const created = await usersService.create({
     name: 'Seed',
     lastname: 'User',
     email,
@@ -30,10 +36,24 @@ export async function seedAuthenticatedUser(
     roles,
   });
 
-  const loginResponse = await request(app.getHttpServer())
-    .post('/auth/login')
-    .send({ email, password })
-    .expect(200);
+  const payload = {
+    sub: created.data.id,
+    email,
+    apps: {
+      application: {
+        ...TICKET_HUB_APPLICATION,
+        roles: roles.map((name, index) => ({
+          id: index + 1,
+          name,
+          description: name,
+        })),
+      },
+    },
+  };
 
-  return (loginResponse.body as { access_token: string }).access_token;
+  return jwt.sign(payload, TEST_PRIVATE_KEY, {
+    algorithm: 'RS256',
+    keyid: TEST_KID,
+    expiresIn: '1h',
+  });
 }

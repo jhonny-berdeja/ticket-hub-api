@@ -11,7 +11,7 @@ import { LoginDto } from './dto/login.dto';
 import { ResponseLogin } from './dto/response-login.dto';
 import { CurrentUser } from './guards/current-user.decorator';
 import { Public } from './guards/public.decorator';
-import { PayloadJwt } from './payload-jwt';
+import type { AuthenticatedUser } from './authenticated-user';
 import { ResponseBody } from '../../common/dto/response-body.dto';
 
 /**
@@ -23,7 +23,15 @@ import { ResponseBody } from '../../common/dto/response-body.dto';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  /** The one @Public() route in the whole API — it's what issues the token everything else requires. */
+  /**
+   * Dead code pending removal: it still signs a valid-looking token, but
+   * `JwtAuthGuard` now verifies exclusively against auth-api's JWKS
+   * (RS256), so nothing this route issues passes that check anymore.
+   * Left in place only until the identity migration to auth-api
+   * (`internal-users` + `X-Application-Name: ticket-hub`) is complete —
+   * removing this and `AuthService.login`/`UsersModule`'s password bits
+   * together, in that step, rather than half-deleting them here.
+   */
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -41,8 +49,8 @@ export class AuthController {
    * endpoints regardless of what a client does with this response.
    */
   @Get('me')
-  me(@CurrentUser() user: PayloadJwt): ResponseBody<PayloadJwt> {
-    return ResponseBody.builder<PayloadJwt>()
+  me(@CurrentUser() user: AuthenticatedUser): ResponseBody<AuthenticatedUser> {
+    return ResponseBody.builder<AuthenticatedUser>()
       .withMsg('Current user')
       .withData(user)
       .build();

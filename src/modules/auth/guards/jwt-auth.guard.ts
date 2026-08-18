@@ -4,10 +4,11 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { PayloadJwt } from '../payload-jwt';
+import * as jwt from 'jsonwebtoken';
+import { AuthenticatedUser } from '../authenticated-user';
+import { JwksClientService } from '../jwks-client.service';
 import { IS_PUBLIC_KEY } from './public.decorator';
 
 const MISSING_TOKEN_MESSAGE = 'Missing or malformed bearer token';
@@ -16,20 +17,22 @@ const INVALID_TOKEN_MESSAGE = 'Invalid or expired token';
 /**
  * Registered globally (see AppModule's APP_GUARD providers) — every
  * route authenticates by default. `@Public()` is the one explicit
- * escape hatch (used only by POST /auth/login, the sole route that
- * cannot require a token since it's what issues one). Verifies the
- * `Authorization: Bearer <token>` header against JWT_SECRET and
- * attaches the decoded payload to `request.user` for `RolesGuard`
- * (also global) and handlers to read afterward.
+ * escape hatch (used only by `POST /auth/login` today -- see that
+ * route's own comment for why it's now dead code pending removal in a
+ * later phase of this migration). Verifies the
+ * `Authorization: Bearer <token>` header against auth-api's RS256
+ * public key, looked up by the token's own `kid` header in
+ * `JwksClientService`'s cache -- ticket-hub-api itself signs nothing
+ * anymore; auth-api is the only issuer.
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
-    private readonly jwtService: JwtService,
+    private readonly jwksClientService: JwksClientService,
     private readonly reflector: Reflector,
   ) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
+  canActivate(context: ExecutionContext): boolean {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -44,13 +47,35 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException(MISSING_TOKEN_MESSAGE);
     }
 
-    const payload = await verifyToken(this.jwtService, token);
+    const payload = this.verifyToken(token);
     if (!payload) {
       throw new UnauthorizedException(INVALID_TOKEN_MESSAGE);
     }
 
-    (request as Request & { user: PayloadJwt }).user = payload;
+    (request as Request & { user: AuthenticatedUser }).user = payload;
     return true;
+  }
+
+  private verifyToken(token: string): AuthenticatedUser | null {
+    const kid = extractKeyId(token);
+    if (!kid) {
+      return null;
+    }
+
+    const key = this.jwksClientService.getKey(kid);
+    if (!key) {
+      console.error(`No cached JWKS key for kid "${kid}"`);
+      return null;
+    }
+
+    try {
+      return jwt.verify(token, key, {
+        algorithms: ['RS256'],
+      }) as unknown as AuthenticatedUser;
+    } catch (error) {
+      console.error('Failed to verify JWT', error);
+      return null;
+    }
   }
 }
 
@@ -64,14 +89,9 @@ function extractBearerToken(request: Request): string | undefined {
   return type === 'Bearer' && token ? token : undefined;
 }
 
-async function verifyToken(
-  jwtService: JwtService,
-  token: string,
-): Promise<PayloadJwt | null> {
-  try {
-    return await jwtService.verifyAsync<PayloadJwt>(token);
-  } catch (error) {
-    console.error('Failed to verify JWT', error);
-    return null;
-  }
+function extractKeyId(token: string): string | undefined {
+  const decoded = jwt.decode(token, { complete: true });
+  return typeof decoded?.header.kid === 'string'
+    ? decoded.header.kid
+    : undefined;
 }

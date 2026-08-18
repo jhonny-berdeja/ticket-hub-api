@@ -60,19 +60,14 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     // hardcoded assignee - same deterministic-id-order reasoning as
     // users.e2e-spec.ts's own final test.
     approverToken = await seedAuthenticatedUser(
-      app,
       moduleFixture,
       'approver@example.com',
       [Role.APPROVER],
     );
-    devToken = await seedAuthenticatedUser(
-      app,
-      moduleFixture,
-      'dev@example.com',
-      [Role.DEV],
-    );
+    devToken = await seedAuthenticatedUser(moduleFixture, 'dev@example.com', [
+      Role.DEV,
+    ]);
     otherDevToken = await seedAuthenticatedUser(
-      app,
       moduleFixture,
       'other-dev@example.com',
       [Role.DEV],

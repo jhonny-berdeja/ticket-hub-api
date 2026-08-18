@@ -7,12 +7,16 @@ import { TicketsRepository } from '../../common/database/ticket/tickets.reposito
 import { RolesRepository } from '../../common/database/role/roles.repository';
 import { Role } from '../../common/database/role/role.enum';
 import { ResponseBody } from '../../common/dto/response-body.dto';
-import { PayloadJwt } from '../auth/payload-jwt';
+import { AuthenticatedUser } from '../auth/authenticated-user';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { TicketMapper } from './ticket.mapper';
 import { TicketResponse } from './ticket-response';
 
 const ASSIGNABLE_ROLES: Role[] = [Role.APPROVER, Role.ADMIN];
+// Same role names as ASSIGNABLE_ROLES, just widened to `string[]` so
+// they can be compared against `RolePayload.name` (a plain string on
+// the auth-api-issued token) without a type error.
+const ASSIGNABLE_ROLE_NAMES: string[] = ASSIGNABLE_ROLES;
 const INVALID_ASSIGNEE_MESSAGE =
   'assignee must be a user with role APPROVER or ADMIN';
 const TICKET_NOT_FOUND_MESSAGE = 'Ticket not found';
@@ -55,10 +59,10 @@ export class TicketsService {
 
   /** DEV sees only tickets they created; APPROVER/ADMIN see every ticket — same product decision as the users list, just role-branched instead of role-gated. */
   async findMineOrAll(
-    user: PayloadJwt,
+    user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse[]>> {
-    const canViewAll = user.roles.some((role) =>
-      ASSIGNABLE_ROLES.includes(role),
+    const canViewAll = user.apps.application.roles.some((role) =>
+      ASSIGNABLE_ROLE_NAMES.includes(role.name),
     );
 
     const tickets = canViewAll
@@ -79,11 +83,11 @@ export class TicketsService {
    */
   async findByNumber(
     number: number,
-    user: PayloadJwt,
+    user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse>> {
     const ticket = await this.ticketsRepository.findByNumber(number);
-    const canViewAll = user.roles.some((role) =>
-      ASSIGNABLE_ROLES.includes(role),
+    const canViewAll = user.apps.application.roles.some((role) =>
+      ASSIGNABLE_ROLE_NAMES.includes(role.name),
     );
 
     if (!ticket || (!canViewAll && ticket.creator !== user.sub)) {
