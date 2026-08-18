@@ -1,212 +1,145 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# ticket-hub-api
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+## ¿Para qué es este proyecto?
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+`ticket-hub-api` es el backend de la ticketera `ticket-hub`. Expone una API
+REST para crear, consultar y aprobar tickets de soporte, valida la identidad
+de cada request contra `auth-api` mediante JWT (RS256) y, al aprobar un
+ticket, notifica a `pcbox-api` para que ejecute la administración asociada.
+Corre únicamente como Pod en el namespace `ticket-hub` del clúster microk8s
+del ecosistema (host `pcbox`): no existe un entorno de desarrollo local, ni
+docker-compose de Postgres, ni archivo `.env` — todos los valores de
+configuración llegan como variables de entorno inyectadas por el Deployment,
+y la app falla al arrancar si falta alguna (`ConfigModule.forRoot({
+ignoreEnvFile: true, validate })`, ver `src/common/config/env.validation.ts`).
 
-## Description
+## ¿Qué hace cada módulo?
 
-Este proyecto es el backend para gestionar los tickets de `ticket-hub`.
+### `auth`
 
-## Environment variables
+Delegado casi por completo a `auth-api`: este módulo no emite ni firma
+tokens propios. `JwksClientService` sondea `AUTH_API_URL` cada 5 minutos
+para refrescar las claves públicas (JWKS) de `auth-api`; `JwtAuthGuard` usa
+esas claves para verificar el bearer token de cada request (algoritmo
+RS256), deja pasar los endpoints marcados con `@Public()` y adjunta el
+usuario decodificado a `request.user`. `RolesGuard` reutiliza los roles
+incluidos en ese payload para restringir endpoints marcados con
+`@Roles(...)`. El único endpoint propio es `GET /auth/me`, que devuelve el
+usuario autenticado actual (`AuthController`).
 
-This app runs **only** as a Pod in the microk8s `ticket-hub` namespace. There is
-no local dev environment, no docker-compose Postgres, and no `.env` file —
-every value below arrives as a container env var injected by the Deployment
-manifest (`ConfigModule.forRoot({ ignoreEnvFile: true, validate })` fails fast
-at boot if any is missing).
+### `tickets`
 
-| Var | Required | Source (in-cluster) | Description |
-|---|---|---|---|
-| `POSTGRES_USER` | Yes | `envFrom: secretRef: ticket-hub-db-credentials` | Postgres role used to connect to `ticket-hub-db` |
-| `POSTGRES_PASSWORD` | Yes | `envFrom: secretRef: ticket-hub-db-credentials` | Password for `POSTGRES_USER` |
-| `DATABASE_HOST` | Yes | literal `env:` → `ticket-hub-db.ticket-hub.svc.cluster.local` | Postgres Service DNS name |
-| `DATABASE_PORT` | Yes | literal `env:` → `5432` | Postgres port |
-| `DATABASE_NAME` | Yes | literal `env:` → `ticket-hub-db` | Database name |
-| `AUTH_API_URL` | Yes | literal `env:` → `http://auth-api.auth-api.svc.cluster.local:3000` | Base URL of auth-api, polled every 5 min for its JWKS (`JwksClientService`) — the RS256 key every request's bearer token is verified against |
-| `PORT` | Yes | literal `env:` → `3000` | HTTP port the Nest app listens on |
-| `LOG_LEVEL` | Yes | literal `env:` → `info` | Minimum pino log level (`trace`/`debug`/`info`/`warn`/`error`/`fatal`) |
-| `PCBOX_API_URL` | Yes | literal `env:` → `http://pcbox-api.pcbox-api.svc.cluster.local:3000` | Base URL of pcbox-api, called by `ApproveTicketService` right after a ticket is approved |
-| `PCBOX_API_ADMIN_KEY` | Yes | `secretRef: pcbox-api-notification-credentials` | Shared secret sent as `x-admin-api-key` — must match pcbox-api's own `ADMIN_API_KEY` |
+Contiene la lógica de negocio de los tickets: `TicketsController` expone
+`POST /tickets` (creación), `GET /tickets` (lista los propios, o todos si el
+usuario es admin), `GET /tickets/by-number/:number` y `PATCH
+/tickets/:id/approve` (solo rol `ADMIN`). `TicketsService` arma el ticket con
+un número secuencial y resuelve las consultas respetando quién puede ver
+qué. `ApproveTicketService` orquesta la aprobación: marca el ticket como
+`APPROVED`, delega en `pcbox-api` (módulo `pcbox-api`) para ejecutar la
+administración correspondiente y guarda el resultado de esa llamada como la
+`response` del ticket.
 
-`pcbox-api-notification-credentials` does not exist yet — creating it
-in-cluster is one of the manual setup steps for the `infra-hub` deploy
-pipeline (see `infra-hub/apps/ticket-hub-api/` and
-`infra-hub/databases/ticket-hub-db.md`, step 9). There's no
-Secret of this app's own anymore — it doesn't sign or verify anything
-with a locally-held value, only `AUTH_API_URL` (a plain value, not a
-Secret) to poll auth-api's JWKS.
+### `pcbox-api`
 
-## Manual verification (once deployed in-cluster)
+Encapsula la integración con el servicio externo `pcbox-api`.
+`PcboxApiConnector` primero se autentica contra `auth-api` (`POST
+/apps-users/login`, con las credenciales `PCBOX_API_CLIENT_ID` /
+`PCBOX_API_CLIENT_SECRET` y el header `X-Application-Name`) y, con el token
+obtenido, llama a `POST /pcbox` en `pcbox-api` para crear la
+"administración" que ejecuta el código Ansible del ticket. `PcboxApiService`
+arma el cuerpo de esa llamada a partir del ticket, y traduce tanto una
+respuesta exitosa (incluyendo `stdout`/`stderr` de la ejecución) como los
+errores o la falta de asignado en un texto legible que queda guardado en el
+ticket.
 
-Kubernetes Deployment/Service manifests for this app live in the separate
-`infra-hub` repo, under `apps/ticket-hub-api/` (change `infra-hub-cicd`) —
-not in this repo. This app's CI (`.github/workflows/release-ticket-hub-api.yml`)
-builds and pushes the image, creates its git tag, and dispatches a deploy
-event; it never touches Kubernetes directly. All automated tests here run
-against a mocked repository (`getRepositoryToken(User)` / a fake
-`UsersRepository`), never a real Postgres, by design (see "Environment
-variables" above). The checklist below cannot run today; it needs
-`infra-hub`'s deploy pipeline to have actually applied those manifests and
-`pcbox-api-notification-credentials` to exist in-cluster first — it is
-written so that first real deploy can confirm the DB round trip without
-re-deriving these steps from the spec/design.
+## ¿Qué variables de entorno necesito?
 
-`.github/workflows/release-ticket-hub-api.yml` is a manually-triggered
-(`workflow_dispatch`-only) workflow: you name the previous stable tag and
-the new tag to release, and it validates both, builds and publishes the
-image, creates the git tag, dispatches the deploy (behind a `production`
-environment approval), and then deletes every other Docker Hub tag for
-this image, keeping only those two. It needs `secrets.DOCKERHUB_TOKEN` to
-have delete scope, not just push/read — see the comment at the top of that
-workflow file for how to regenerate it.
+### Variables para el pipeline de GitHub Actions
 
-### 1. Confirm the Pods are up
+El único workflow del repo es `.github/workflows/release-ticket-hub-api.yml`.
+La guía paso a paso para obtener cada valor está en
+`.github/workflows/obtain-secrets.md`; acá va el resumen:
+
+- **`DOCKERHUB_USERNAME` y `DOCKERHUB_TOKEN`**: identifican la cuenta/organización
+  de Docker Hub donde se publica la imagen `ticket-hub-api`. `DOCKERHUB_USERNAME`
+  es el username (o nombre de organización) de esa cuenta; `DOCKERHUB_TOKEN` es
+  un Access Token generado desde Docker Hub → Account Settings → Security, y
+  necesita permisos **Read, Write y Delete** (no alcanza con "Read & Write"),
+  porque además de loguear y publicar la imagen, el job `cleanup-tags` lo usa
+  para borrar los tags viejos después de cada release.
+- **`INFRA_HUB_DISPATCH_TOKEN`**: personal access token (fine-grained) de
+  GitHub, con permisos `Actions: Read and write` y `Contents: Read-only`
+  sobre el repositorio `infra-hub`. Lo usan `dispatch-infra-hub-deploy.sh` y
+  `wait-for-infra-hub-deploy.sh` para disparar el workflow de deploy en
+  `infra-hub` y luego consultar el estado de esa corrida. Se guarda como
+  secreto en **este** repositorio (`ticket-hub-api`), no en `infra-hub`.
+
+### Variables para el funcionamiento de la app
+
+Todas son obligatorias en runtime (`src/common/config/env.validation.ts`
+valida esto al bootear y la app no arranca si falta alguna):
+
+- **`POSTGRES_USER` y `POSTGRES_PASSWORD`**: credenciales del rol de Postgres
+  usado para conectarse a `ticket-hub-db`; en el clúster llegan desde el
+  Secret `ticket-hub-db-credentials`.
+- **`DATABASE_HOST`, `DATABASE_PORT` y `DATABASE_NAME`**: ubicación de la base
+  de datos. En el clúster son valores literales: el nombre DNS del Service de
+  Postgres (`ticket-hub-db.ticket-hub.svc.cluster.local`), el puerto `5432`
+  y el nombre de base `ticket-hub-db`.
+- **`AUTH_API_URL`**: URL base de `auth-api` (DNS interno del clúster). La
+  usan tanto `JwksClientService` (para refrescar las claves JWKS cada 5
+  minutos) como `PcboxApiConnector` (para loguearse antes de llamar a
+  `pcbox-api`).
+- **`PORT`**: puerto HTTP en el que escucha la app Nest (`3000` en el
+  clúster).
+- **`LOG_LEVEL`**: nivel mínimo de log de pino (`trace`/`debug`/`info`/
+  `warn`/`error`/`fatal`).
+- **`PCBOX_API_URL`**: URL base de `pcbox-api`, contra la que se llama
+  `POST /pcbox` al aprobar un ticket.
+- **`PCBOX_API_APPLICATION_NAME`**: nombre de aplicación enviado como header
+  `X-Application-Name` al loguearse en `auth-api` antes de llamar a
+  `pcbox-api`; debe coincidir con el nombre con el que `pcbox-api` está
+  registrado en la tabla `applications` de `auth-api`.
+- **`PCBOX_API_CLIENT_ID` y `PCBOX_API_CLIENT_SECRET`**: credenciales de
+  tipo "apps-user" con las que `PcboxApiConnector` se loguea contra
+  `auth-api` (`POST /apps-users/login`) antes de llamar a `pcbox-api`.
+  Reemplazan a la vieja clave compartida `PCBOX_API_ADMIN_KEY`. En el
+  clúster llegan desde el Secret `pcbox-api-notification-credentials`, que
+  no se crea automáticamente: es uno de los pasos manuales del pipeline de
+  deploy de `infra-hub` (ver `infra-hub/apps/ticket-hub-api/` y
+  `infra-hub/databases/ticket-hub-db.md`, paso 9).
+
+## ¿Cómo se ejecuta la app?
+
+La app se ejecuta exclusivamente como Pod en el clúster microk8s del
+servidor `pcbox`; no hay un modo "correr localmente" soportado para
+producción. Para desplegar una nueva versión hay que ir a GitHub Actions y
+disparar manualmente (`workflow_dispatch`) el workflow
+`release-ticket-hub-api.yml`, completando dos inputs:
+
+- **`previous_stable_tag`**: el tag de la última versión estable conocida,
+  la que se conserva como respaldo. El workflow valida que ese tag ya exista
+  como tag de git y como tag de la imagen en Docker Hub.
+- **`new_tag`**: el tag de la nueva versión a construir, publicar y
+  desplegar. El workflow valida que ese tag **no** exista todavía ni como
+  tag de git ni en Docker Hub.
+
+A partir de ahí el workflow encadena varios jobs: `validate` confirma que
+los secretos y ambos tags son correctos; `build-and-push` construye la
+imagen Docker, la publica en Docker Hub con el `new_tag` y crea el tag de
+git correspondiente; `approve-and-deploy` requiere una aprobación manual en
+el ambiente de GitHub `production` y, una vez aprobado, dispara (usando
+`INFRA_HUB_DISPATCH_TOKEN`) el workflow de deploy del repositorio
+`infra-hub`, esperando a que esa corrida termine antes de continuar — es ese
+workflow de `infra-hub` el que aplica los manifiestos de Kubernetes
+(`infra-hub/apps/ticket-hub-api/`: `deployment.yaml`, `service.yaml`,
+`namespace.yaml`) contra microk8s; este repositorio nunca toca Kubernetes
+directamente. Por último, `cleanup-tags` borra de Docker Hub todos los tags
+de la imagen `ticket-hub-api` excepto `previous_stable_tag` y `new_tag`.
+
+Una vez desplegado, se puede confirmar que el Pod está sano con:
 
 ```bash
 microk8s kubectl get pods -n ticket-hub
 microk8s kubectl logs -n ticket-hub deployment/ticket-hub-api
 ```
-
-Both `ticket-hub-db-...` and `ticket-hub-api-...` should show `Running`. The
-API log should show Nest's normal route map at boot (`Mapped {/tickets,
-POST}`, `Mapped {/auth/me, GET}`, no `/users` — that module is gone, see
-"Environment variables" above for the identity migration) with no
-`Missing required environment variable(s)` error — if that error appears,
-the Deployment/Secret wiring is missing one of the vars in the table
-above.
-
-### 2. Confirm the browser-facing cookie flow through `ticket-hub`
-
-> **Stale until Phase 4:** `ticket-hub`'s own login (`app/api/login/route.ts`)
-> still calls this app's `/auth/login`, which no longer exists — this
-> step describes the target state once `ticket-hub`'s frontend is
-> repointed at auth-api's `POST /internal-users/login`, not what works
-> today.
-
-This exercises `ticket-hub`'s `app/api/login/route.ts`, which is the only
-place `ticket-hub-token` is ever set (the API itself never sets cookies —
-see design's Data Flow / Decision 1). Port-forward the `ticket-hub` Service
-instead of the API:
-
-```bash
-microk8s kubectl port-forward -n ticket-hub svc/ticket-hub 3001:3000
-```
-
-```bash
-curl -i -X POST http://localhost:3001/api/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"smoke-test@example.com","password":"secret1"}' \
-  -c /tmp/ticket-hub-cookies.txt
-```
-
-Expected in the response headers: `Set-Cookie: ticket-hub-token=...;
-Path=/; Max-Age=3600; HttpOnly; SameSite=Lax` (plus `Secure` once
-`TICKET_HUB_COOKIE_SECURE=true` is set — confirm it is **absent** if that
-var is still unset/false, since `Secure` over plain HTTP would silently
-drop the cookie in a real browser). Body must be `{"ok":true}` — the raw
-JWT must **not** appear anywhere in the response body.
-
-```bash
-curl -i -X POST http://localhost:3001/api/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"smoke-test@example.com","password":"wrong-password"}'
-```
-
-Expected: `401`, `{"message":"Invalid credentials"}`, and **no** `Set-Cookie`
-header at all.
-
-Finally, open `/login` in an actual browser through whatever exposes
-`ticket-hub` (Ingress/Tailscale — see design's Open Questions), submit valid
-credentials, and confirm in devtools → Application → Cookies that
-`ticket-hub-token` is listed with `HttpOnly` checked and is **not** visible
-via `document.cookie` in the console; confirm the page navigates to `/home`.
-
-## Project setup
-
-```bash
-$ npm install
-```
-
-## Compile and run the project
-
-```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
