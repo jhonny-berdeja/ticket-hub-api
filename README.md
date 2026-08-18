@@ -23,7 +23,7 @@
 
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Este proyecto es el backend para gestionar los tickets de `ticket-hub`.
 
 ## Environment variables
 
