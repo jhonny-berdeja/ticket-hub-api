@@ -9,26 +9,6 @@ import { TicketResponse } from './ticket-response';
 
 const TICKET_NOT_FOUND_MESSAGE = 'Ticket not found';
 
-/**
- * Split out of `TicketsService`: `approve` leans on its own private
- * helper (`findExistingTicketOrThrow`), so per the module-service
- * convention it gets a dedicated file instead of living alongside the
- * self-contained handlers in `tickets.service.ts`. Mirrors
- * `UpdateUserService`.
- *
- * No role check in here: `@Roles(Role.APPROVER, Role.ADMIN)` on the
- * controller already restricts who can reach this at all, and either
- * role may approve *any* ticket - no ownership/assignee check, unlike
- * `findByNumber`'s DEV-only-own-tickets restriction.
- *
- * Notifying pcbox-api is intentionally its own step, after the status
- * update, not before and not wrapped in the same transaction: approval
- * is a business decision that must stand on its own, independent of
- * whether the technical call to trigger the playbook succeeds
- * (confirmed product decision). `PcboxApiService.notifyApproval` never
- * throws — whatever it returns (a success summary or a failure
- * description) always gets persisted to `response`.
- */
 @Injectable()
 export class ApproveTicketService {
   constructor(
