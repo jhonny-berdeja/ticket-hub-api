@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './modules/auth/auth.module';
-import { UsersModule } from './modules/users/users.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { EnvModule } from './common/config/env.module';
 import { DatabaseModule } from './common/database/database.module';
@@ -13,14 +12,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 
 @Module({
-  imports: [
-    EnvModule,
-    LoggerModule,
-    DatabaseModule,
-    UsersModule,
-    AuthModule,
-    TicketsModule,
-  ],
+  imports: [EnvModule, LoggerModule, DatabaseModule, AuthModule, TicketsModule],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },

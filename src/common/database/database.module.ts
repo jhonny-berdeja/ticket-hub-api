@@ -1,10 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { UserEntity } from './user/user.entity';
-import { UsersRepository } from './user/users.repository';
-import { RoleEntity } from './role/role.entity';
-import { RolesRepository } from './role/roles.repository';
 import { TicketEntity } from './ticket/ticket.entity';
 import { TicketsRepository } from './ticket/tickets.repository';
 
@@ -12,7 +8,15 @@ import { TicketsRepository } from './ticket/tickets.repository';
  * `EnvModule` is not imported here: it's `@Global()` too, so once it loads
  * in `AppModule`, `ConfigService` is already injectable everywhere —
  * `inject: [ConfigService]` below works without a local import, same reason
- * `UsersModule`/`AuthModule` don't import this module to get `UsersRepository`.
+ * `AuthModule` doesn't import this module to get `TicketsRepository`.
+ *
+ * `UserEntity`/`RoleEntity`/`UsersRepository`/`RolesRepository` are gone --
+ * ticket-hub authenticates against auth-api now (JwtAuthGuard verifies
+ * via JWKS), and the local `users`/`roles` tables had no other consumer
+ * left once `TicketsService`'s assignee-role check and `PcboxApiService`'s
+ * name lookups were retired (see `TicketEntity`'s doc comment for the
+ * full history). The tables themselves are dropped by a migration, not
+ * this module -- see pcbox-api/documentation/pcbox.ticket-hub-db-deploy.md §11.
  */
 @Global()
 @Module({
@@ -29,13 +33,13 @@ import { TicketsRepository } from './ticket/tickets.repository';
         username: configService.get<string>('POSTGRES_USER'),
         password: configService.get<string>('POSTGRES_PASSWORD'),
         database: configService.get<string>('DATABASE_NAME'),
-        entities: [UserEntity, RoleEntity, TicketEntity],
+        entities: [TicketEntity],
         synchronize: false,
       }),
     }),
-    TypeOrmModule.forFeature([UserEntity, RoleEntity, TicketEntity]),
+    TypeOrmModule.forFeature([TicketEntity]),
   ],
-  providers: [UsersRepository, RolesRepository, TicketsRepository],
-  exports: [UsersRepository, RolesRepository, TicketsRepository, TypeOrmModule],
+  providers: [TicketsRepository],
+  exports: [TicketsRepository, TypeOrmModule],
 })
 export class DatabaseModule {}

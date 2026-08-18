@@ -1,13 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { TicketEntity } from '../../common/database/ticket/ticket.entity';
-import { UsersRepository } from '../../common/database/user/users.repository';
 import {
   PcboxApiConnector,
   PcboxApiCreateAdministrationBody,
 } from './pcbox-api.connector';
 
-const UNRESOLVED_NAMES_MESSAGE =
-  'pcbox-api not notified: could not resolve creator/assignee name';
+const UNASSIGNED_MESSAGE = 'pcbox-api not notified: ticket has no assignee';
 
 interface PcboxApiSuccessBody {
   msg: string;
@@ -27,7 +25,7 @@ interface PcboxApiErrorBody {
 
 /**
  * Owns the *decision* around notifying pcbox-api once a ticket is
- * approved: who `informer`/`approver` resolve to, what to send, and how
+ * approved: what `informer`/`approver` resolve to, what to send, and how
  * to turn whatever comes back into the string that ends up in
  * `TicketEntity.response` — the complete `msg` + execution outcome +
  * stdout/stderr on success, a failure description otherwise. Never a
@@ -35,6 +33,12 @@ interface PcboxApiErrorBody {
  * approval itself (confirmed product decision, see
  * `ApproveTicketService`). `PcboxApiConnector` owns only the HTTP
  * mechanics (see its own comment).
+ *
+ * `informer`/`approver` are read straight off the ticket
+ * (`TicketEntity.informer`/`.assignee`, both plain strings captured at
+ * creation time) — no user lookup anymore, since there's no local
+ * `users` table left to look anyone up in (see `TicketEntity`'s doc
+ * comment for the full history).
  *
  * `department` is sent as-is even though `tickets.department` allows up
  * to 25 characters and pcbox-api's own `CreatePcboxDto.department` caps
@@ -46,16 +50,13 @@ interface PcboxApiErrorBody {
  */
 @Injectable()
 export class PcboxApiService {
-  constructor(
-    private readonly pcboxApiConnector: PcboxApiConnector,
-    private readonly usersRepository: UsersRepository,
-  ) {}
+  constructor(private readonly pcboxApiConnector: PcboxApiConnector) {}
 
   /** Always resolves — never rejects. The returned string is exactly what `ApproveTicketService` should persist as `TicketEntity.response`. */
   async notifyApproval(ticket: TicketEntity): Promise<string> {
-    const body = await this.buildRequestBody(ticket);
+    const body = this.buildRequestBody(ticket);
     if (!body) {
-      return UNRESOLVED_NAMES_MESSAGE;
+      return UNASSIGNED_MESSAGE;
     }
 
     try {
@@ -67,26 +68,18 @@ export class PcboxApiService {
     }
   }
 
-  private async buildRequestBody(
+  private buildRequestBody(
     ticket: TicketEntity,
-  ): Promise<PcboxApiCreateAdministrationBody | null> {
+  ): PcboxApiCreateAdministrationBody | null {
     if (ticket.assignee === null) {
-      return null;
-    }
-
-    const [creator, assignee] = await Promise.all([
-      this.usersRepository.findById(ticket.creator),
-      this.usersRepository.findById(ticket.assignee),
-    ]);
-    if (!creator || !assignee) {
       return null;
     }
 
     return {
       ticketNumber: ticket.number,
       department: ticket.department,
-      informer: creator.name,
-      approver: assignee.name,
+      informer: ticket.informer,
+      approver: ticket.assignee,
       status: ticket.status,
       fileContent: ticket.codeAnsible ?? '',
     };

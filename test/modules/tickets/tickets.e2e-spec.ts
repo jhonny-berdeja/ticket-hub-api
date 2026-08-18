@@ -1,12 +1,13 @@
 import { INestApplication } from '@nestjs/common';
-import { TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { UsersModule } from '../../../src/modules/users/users.module';
 import { TicketsModule } from '../../../src/modules/tickets/tickets.module';
 import { Role } from '../../../src/common/database/role/role.enum';
 import { bootstrapTestApp } from '../../common/bootstrap-test-app';
 import { seedAuthenticatedUser } from '../../common/seed-authenticated-user';
+
+const CREATOR_EMAIL = 'creator@example.com';
+const OTHER_USER_EMAIL = 'other-user@example.com';
 
 function pcboxApiSuccessResponse(): Response {
   return new Response(
@@ -26,21 +27,23 @@ function pcboxApiSuccessResponse(): Response {
 }
 
 /**
- * Real end-to-end: real `TicketsModule`/`UsersModule` against a real —
- * if in-memory — database. Only `fetch` is mocked, the one external
- * boundary that cannot run in this environment at all: `ApproveTicketService`
- * calls the real pcbox-api right after approval (see `PcboxApiService`).
+ * Real end-to-end: real `TicketsModule` against a real — if in-memory —
+ * database. Only `fetch` is mocked, the one external boundary that
+ * cannot run in this environment at all: `ApproveTicketService` calls
+ * the real pcbox-api right after approval (see `PcboxApiService`).
+ * DEV/APPROVER are gone (see `TicketEntity`'s doc comment): any
+ * authenticated user can create a ticket, only ADMIN approves, and
+ * "own tickets vs. every ticket" now branches on ADMIN alone.
  */
 describe('Tickets flow (e2e, in-memory DB)', () => {
   let app: INestApplication<App>;
-  let moduleFixture: TestingModule;
-  let devToken: string;
-  let otherDevToken: string;
-  let approverToken: string;
+  let creatorToken: string;
+  let otherUserToken: string;
+  let adminToken: string;
   let fetchSpy: jest.SpiedFunction<typeof fetch>;
 
   const validTicketBody = () => ({
-    assignee: 1, // the seeded APPROVER is always created first, id 1
+    assignee: 'Ana Aprobadora',
     department: 'Datacenter',
     subject: 'Servidor caído',
     description: 'El servidor de prod no responde',
@@ -51,27 +54,11 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     process.env.PCBOX_API_URL = 'http://pcbox-api.test';
     process.env.PCBOX_API_ADMIN_KEY = 'test-pcbox-admin-key';
 
-    ({ app, moduleFixture } = await bootstrapTestApp([
-      UsersModule,
-      TicketsModule,
-    ]));
+    ({ app } = await bootstrapTestApp([TicketsModule]));
 
-    // Seeded first on purpose so its id is 1, matching validTicketBody()'s
-    // hardcoded assignee - same deterministic-id-order reasoning as
-    // users.e2e-spec.ts's own final test.
-    approverToken = await seedAuthenticatedUser(
-      moduleFixture,
-      'approver@example.com',
-      [Role.APPROVER],
-    );
-    devToken = await seedAuthenticatedUser(moduleFixture, 'dev@example.com', [
-      Role.DEV,
-    ]);
-    otherDevToken = await seedAuthenticatedUser(
-      moduleFixture,
-      'other-dev@example.com',
-      [Role.DEV],
-    );
+    creatorToken = seedAuthenticatedUser(CREATOR_EMAIL, []);
+    otherUserToken = seedAuthenticatedUser(OTHER_USER_EMAIL, []);
+    adminToken = seedAuthenticatedUser('admin@example.com', [Role.ADMIN]);
   });
 
   afterAll(async () => {
@@ -86,26 +73,10 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     fetchSpy.mockRestore();
   });
 
-  it('rejects ticket creation from a non-DEV', async () => {
-    await request(app.getHttpServer())
-      .post('/tickets')
-      .set('Authorization', `Bearer ${approverToken}`)
-      .send(validTicketBody())
-      .expect(403);
-  });
-
-  it('rejects an assignee who is not APPROVER/ADMIN', async () => {
-    await request(app.getHttpServer())
-      .post('/tickets')
-      .set('Authorization', `Bearer ${devToken}`)
-      .send({ ...validTicketBody(), assignee: 2 }) // the other DEV, id 2
-      .expect(400);
-  });
-
-  it('happy path: DEV creates a ticket, numbered TK-1, status CREATED', async () => {
+  it('happy path: any authenticated user creates a ticket, numbered TK-1, status CREATED', async () => {
     const response = await request(app.getHttpServer())
       .post('/tickets')
-      .set('Authorization', `Bearer ${devToken}`)
+      .set('Authorization', `Bearer ${creatorToken}`)
       .send(validTicketBody())
       .expect(201);
 
@@ -115,7 +86,8 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
         id: expect.any(Number) as number,
         number: 'TK-1',
         creator: expect.any(Number) as number,
-        assignee: 1,
+        informer: CREATOR_EMAIL,
+        assignee: 'Ana Aprobadora',
         department: 'Datacenter',
         subject: 'Servidor caído',
         status: 'CREATED',
@@ -127,44 +99,44 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('DEV sees only their own tickets; APPROVER sees every ticket', async () => {
-    // A second ticket, created by the other DEV, so there are two total.
+  it('non-ADMIN sees only their own tickets; ADMIN sees every ticket', async () => {
+    // A second ticket, created by another non-admin, so there are two total.
     await request(app.getHttpServer())
       .post('/tickets')
-      .set('Authorization', `Bearer ${otherDevToken}`)
+      .set('Authorization', `Bearer ${otherUserToken}`)
       .send(validTicketBody())
       .expect(201);
 
-    const devResponse = await request(app.getHttpServer())
+    const creatorResponse = await request(app.getHttpServer())
       .get('/tickets')
-      .set('Authorization', `Bearer ${devToken}`)
+      .set('Authorization', `Bearer ${creatorToken}`)
       .expect(200);
-    const devTickets = (devResponse.body as { data: { number: string }[] })
-      .data;
-    expect(devTickets).toHaveLength(1);
-    expect(devTickets[0].number).toBe('TK-1');
-
-    const approverResponse = await request(app.getHttpServer())
-      .get('/tickets')
-      .set('Authorization', `Bearer ${approverToken}`)
-      .expect(200);
-    const approverTickets = (
-      approverResponse.body as { data: { number: string }[] }
+    const creatorTickets = (
+      creatorResponse.body as { data: { number: string }[] }
     ).data;
-    expect(approverTickets).toHaveLength(2);
+    expect(creatorTickets).toHaveLength(1);
+    expect(creatorTickets[0].number).toBe('TK-1');
+
+    const adminResponse = await request(app.getHttpServer())
+      .get('/tickets')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const adminTickets = (adminResponse.body as { data: { number: string }[] })
+      .data;
+    expect(adminTickets).toHaveLength(2);
   });
 
-  it('rejects a DEV looking up a ticket by number that is not theirs', async () => {
+  it('rejects a non-ADMIN looking up a ticket by number that is not theirs', async () => {
     await request(app.getHttpServer())
       .get('/tickets/by-number/2')
-      .set('Authorization', `Bearer ${devToken}`)
+      .set('Authorization', `Bearer ${creatorToken}`)
       .expect(404);
   });
 
-  it('lets an APPROVER look up any ticket by number', async () => {
+  it('lets an ADMIN look up any ticket by number', async () => {
     const response = await request(app.getHttpServer())
       .get('/tickets/by-number/1')
-      .set('Authorization', `Bearer ${approverToken}`)
+      .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
     expect((response.body as { data: { number: string } }).data.number).toBe(
@@ -172,19 +144,19 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     );
   });
 
-  it('rejects approval from a DEV', async () => {
+  it('rejects approval from a non-ADMIN', async () => {
     await request(app.getHttpServer())
       .patch('/tickets/1/approve')
-      .set('Authorization', `Bearer ${devToken}`)
+      .set('Authorization', `Bearer ${creatorToken}`)
       .expect(403);
   });
 
-  it('happy path: APPROVER approves a ticket, and pcbox-api gets notified', async () => {
+  it('happy path: ADMIN approves a ticket, and pcbox-api gets notified', async () => {
     fetchSpy.mockResolvedValue(pcboxApiSuccessResponse());
 
     const response = await request(app.getHttpServer())
       .patch('/tickets/1/approve')
-      .set('Authorization', `Bearer ${approverToken}`)
+      .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
     const body = response.body as {
@@ -211,10 +183,8 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
         body: JSON.stringify({
           ticketNumber: 1,
           department: 'Datacenter',
-          // seedAuthenticatedUser hardcodes name: 'Seed' for every user
-          // it creates, creator and assignee both resolve to it here.
-          informer: 'Seed',
-          approver: 'Seed',
+          informer: CREATOR_EMAIL,
+          approver: 'Ana Aprobadora',
           status: 'APPROVED',
           fileContent: 'playbook: restart.yml',
         }),
@@ -227,7 +197,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
 
     const response = await request(app.getHttpServer())
       .patch('/tickets/2/approve')
-      .set('Authorization', `Bearer ${approverToken}`)
+      .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
     const body = response.body as {
@@ -240,7 +210,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
   it('404s approving a ticket that does not exist', async () => {
     await request(app.getHttpServer())
       .patch('/tickets/999/approve')
-      .set('Authorization', `Bearer ${approverToken}`)
+      .set('Authorization', `Bearer ${adminToken}`)
       .expect(404);
 
     expect(fetchSpy).not.toHaveBeenCalled();

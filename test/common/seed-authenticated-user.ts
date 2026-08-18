@@ -1,7 +1,5 @@
-import { TestingModule } from '@nestjs/testing';
 import * as jwt from 'jsonwebtoken';
 import { Role } from '../../src/common/database/role/role.enum';
-import { UsersService } from '../../src/modules/users/users.service';
 import { TEST_KID, TEST_PRIVATE_KEY } from './test-jwt-keys';
 
 const TICKET_HUB_APPLICATION = {
@@ -11,33 +9,22 @@ const TICKET_HUB_APPLICATION = {
 };
 
 /**
- * Seeds a user directly through the real `UsersService` (bypassing the
- * `POST /users` guard entirely, since this is a plain method call, not
- * an HTTP request), then signs an auth-api-shaped token directly with
- * the test RSA key -- NOT via `POST /auth/login` anymore, since that
- * route now issues a locally-signed token `JwtAuthGuard` won't accept
- * (see `auth.controller.ts`'s comment). `sub` is fabricated (the local
- * `UsersService.create` return value isn't needed by any of these
- * callers today) rather than round-tripped through the DB.
+ * Counter, not a DB id: there's no local `users` table left to insert
+ * into (ticket-hub authenticates against auth-api now) -- `sub` only
+ * needs to be a distinct number per seeded user within one test run, so
+ * "my tickets vs. someone else's" filtering has something real to
+ * distinguish on.
  */
-export async function seedAuthenticatedUser(
-  moduleFixture: TestingModule,
-  email: string,
-  roles: Role[],
-): Promise<string> {
-  const password = 'secret1';
+let nextSub = 1;
 
-  const usersService = moduleFixture.get(UsersService);
-  const created = await usersService.create({
-    name: 'Seed',
-    lastname: 'User',
-    email,
-    password,
-    roles,
-  });
-
+/**
+ * Signs an auth-api-shaped token directly with the test RSA key -- no
+ * DB, no HTTP round trip, since there's no local login left to go
+ * through either (see `auth.controller.ts`'s history).
+ */
+export function seedAuthenticatedUser(email: string, roles: Role[]): string {
   const payload = {
-    sub: created.data.id,
+    sub: nextSub++,
     email,
     apps: {
       application: {

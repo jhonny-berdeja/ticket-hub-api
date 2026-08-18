@@ -1,9 +1,7 @@
 import { INestApplication } from '@nestjs/common';
-import { TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthModule } from '../../../src/modules/auth/auth.module';
-import { UsersModule } from '../../../src/modules/users/users.module';
 import { Role } from '../../../src/common/database/role/role.enum';
 import { bootstrapTestApp } from '../../common/bootstrap-test-app';
 import { seedAuthenticatedUser } from '../../common/seed-authenticated-user';
@@ -17,12 +15,10 @@ import { seedAuthenticatedUser } from '../../common/seed-authenticated-user';
  */
 describe('Auth flow (e2e, in-memory DB)', () => {
   let app: INestApplication<App>;
-  let moduleFixture: TestingModule;
 
   beforeAll(async () => {
-    const testApp = await bootstrapTestApp([UsersModule, AuthModule]);
+    const testApp = await bootstrapTestApp([AuthModule]);
     app = testApp.app;
-    moduleFixture = testApp.moduleFixture;
   });
 
   afterAll(async () => {
@@ -30,11 +26,7 @@ describe('Auth flow (e2e, in-memory DB)', () => {
   });
 
   it('GET /auth/me returns the caller identity/roles for an auth-api-issued token', async () => {
-    const token = await seedAuthenticatedUser(
-      moduleFixture,
-      'other-user@example.com',
-      [Role.DEV],
-    );
+    const token = seedAuthenticatedUser('other-user@example.com', [Role.ADMIN]);
 
     const response = await request(app.getHttpServer())
       .get('/auth/me')
@@ -53,7 +45,7 @@ describe('Auth flow (e2e, in-memory DB)', () => {
     expect(body.data.email).toBe('other-user@example.com');
     expect(body.data.apps.application.name).toBe('ticket-hub');
     expect(body.data.apps.application.roles.map((role) => role.name)).toEqual([
-      Role.DEV,
+      Role.ADMIN,
     ]);
   });
 

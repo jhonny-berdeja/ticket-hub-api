@@ -5,7 +5,8 @@ export interface TicketResponse {
   id: number;
   number: string;
   creator: number;
-  assignee: number | null;
+  informer: string;
+  assignee: string | null;
   department: string;
   subject: string;
   status: TicketStatus;

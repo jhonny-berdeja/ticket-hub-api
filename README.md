@@ -86,74 +86,20 @@ microk8s kubectl logs -n ticket-hub deployment/ticket-hub-api
 ```
 
 Both `ticket-hub-db-...` and `ticket-hub-api-...` should show `Running`. The
-API log should show Nest's normal route map at boot (`Mapped {/users, POST}`,
-`Mapped {/auth/me, GET}`) with no `Missing required environment
-variable(s)` error — if that error appears, the Deployment/Secret wiring is
-missing one of the vars in the table above.
+API log should show Nest's normal route map at boot (`Mapped {/tickets,
+POST}`, `Mapped {/auth/me, GET}`, no `/users` — that module is gone, see
+"Environment variables" above for the identity migration) with no
+`Missing required environment variable(s)` error — if that error appears,
+the Deployment/Secret wiring is missing one of the vars in the table
+above.
 
-### 2. Exercise `POST /users` directly against the API
+### 2. Confirm the browser-facing cookie flow through `ticket-hub`
 
-`/auth/login` doesn't exist anymore — ticket-hub authenticates against
-auth-api's `POST /internal-users/login` instead (`X-Application-Name:
-ticket-hub`), and this app only verifies the resulting token (see
-`src/modules/auth/guards/jwt-auth.guard.ts`). Getting a real bearer token
-to test `GET /auth/me` or any guarded route this way means logging in
-through auth-api first, not through anything exposed here.
-
-Port-forward the API Service to the workstation (or `kubectl exec` into any
-Pod in the namespace and `curl` the in-cluster DNS name directly — either
-works):
-
-```bash
-microk8s kubectl port-forward -n ticket-hub svc/ticket-hub-api 3000:3000
-```
-
-In a second shell:
-
-```bash
-curl -i -X POST http://localhost:3000/users \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Ana","lastname":"Perez","email":"smoke-test@example.com","password":"secret1"}'
-```
-
-Expected: `401 Unauthorized` — `POST /users` requires ADMIN now, same as
-every other route but `GET /auth/me`, and this curl carries no bearer
-token. Confirming that is the actual smoke test here: it proves
-`JwtAuthGuard`/`JwksClientService` are wired and rejecting unauthenticated
-requests, not that user creation itself works end-to-end (that needs a
-real auth-api-issued ADMIN token, out of scope for this quick check).
-
-### 3. Confirm the schema was not touched
-
-```bash
-microk8s kubectl exec -it -n ticket-hub deployment/ticket-hub-db -- \
-  psql -U "$POSTGRES_USER" -d ticket-hub-db -c '\d users'
-```
-
-Compare column-by-column against the baseline in
-`pcbox-api/documentation/pcbox.bootstrap.md` §8.4 (`id`, `name VARCHAR(15)`,
-`lastname VARCHAR(15)`, `email VARCHAR(30) UNIQUE`, `password VARCHAR(100)`).
-It must be byte-for-byte the same before and after step 2 — `synchronize:
-false` means the app must never alter this table.
-
-```bash
-microk8s kubectl exec -it -n ticket-hub deployment/ticket-hub-db -- \
-  psql -U "$POSTGRES_USER" -d ticket-hub-db -c "SELECT id,name,lastname,email FROM users WHERE email='smoke-test@example.com';"
-```
-
-Expected: exactly one row with a bcrypt-looking hash in `password` (not
-shown in this `SELECT`, but confirm separately with `SELECT password FROM
-users WHERE email='smoke-test@example.com';` that it starts with `$2b$` and
-is not the plaintext `secret1`).
-
-Clean up the test row once done:
-
-```bash
-microk8s kubectl exec -it -n ticket-hub deployment/ticket-hub-db -- \
-  psql -U "$POSTGRES_USER" -d ticket-hub-db -c "DELETE FROM users WHERE email='smoke-test@example.com';"
-```
-
-### 4. Confirm the browser-facing cookie flow through `ticket-hub`
+> **Stale until Phase 4:** `ticket-hub`'s own login (`app/api/login/route.ts`)
+> still calls this app's `/auth/login`, which no longer exists — this
+> step describes the target state once `ticket-hub`'s frontend is
+> repointed at auth-api's `POST /internal-users/login`, not what works
+> today.
 
 This exercises `ticket-hub`'s `app/api/login/route.ts`, which is the only
 place `ticket-hub-token` is ever set (the API itself never sets cookies —

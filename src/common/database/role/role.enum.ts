@@ -1,12 +1,11 @@
 /**
- * The three roles the business defines. Values are the exact strings
- * stored in `roles.rol` (VARCHAR(15)) — all fit comfortably under that
- * limit ("APPROVER" is the longest, at 8 chars).
+ * Only ADMIN is checked anywhere anymore -- DEV/APPROVER retired along
+ * with the local users/roles tables (see AppModule/DatabaseModule
+ * history): ticket-hub authenticates against auth-api now, and only
+ * ADMIN is meaningful there today. Values are exact strings compared
+ * against `RolePayload.name` on the auth-api-issued token (see
+ * RolesGuard).
  */
 export enum Role {
   ADMIN = 'ADMIN',
-  DEV = 'DEV',
-  APPROVER = 'APPROVER',
 }
-
-export const ALL_ROLES: readonly Role[] = [Role.ADMIN, Role.DEV, Role.APPROVER];

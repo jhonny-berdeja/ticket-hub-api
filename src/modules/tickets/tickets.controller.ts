@@ -20,9 +20,9 @@ import { ApproveTicketService } from './approve-ticket.service';
 import { TicketResponse } from './ticket-response';
 
 /**
- * No class-level @Roles() here, unlike UsersController: every route
- * needs a different rule, so each one declares its own. Authentication
- * (JwtAuthGuard) is still global regardless.
+ * No class-level @Roles() here: every route needs a different rule (or
+ * none), so each one declares its own. Authentication (JwtAuthGuard) is
+ * still global regardless.
  */
 @Controller('tickets')
 export class TicketsController {
@@ -31,23 +31,27 @@ export class TicketsController {
     private readonly approveTicketService: ApproveTicketService,
   ) {}
 
-  /** Only a DEV can create a ticket - confirmed product decision, APPROVER/ADMIN are excluded on purpose. */
+  /**
+   * No @Roles() restriction: any authenticated ticket-hub user can
+   * create a ticket now — DEV/APPROVER retired along with the local
+   * roles table, only ADMIN is a meaningful distinction today (used
+   * below to gate approval, not creation). `user.email` becomes
+   * `TicketEntity.informer`, captured now since there's no local
+   * `users` table left to resolve `creator` to a name from later.
+   */
   @Post()
-  @Roles(Role.DEV)
   @HttpCode(HttpStatus.CREATED)
   create(
     @Body() dto: CreateTicketDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse>> {
-    return this.ticketsService.create(dto, user.sub);
+    return this.ticketsService.create(dto, user.sub, user.email);
   }
 
   /**
-   * No @Roles() restriction: every role (DEV/APPROVER/ADMIN) can call
-   * this, since there are only three roles and all three have some form
-   * of access — the service branches on the caller's role to decide
-   * *which* tickets to return (own vs. all), not whether to allow the
-   * call at all.
+   * No @Roles() restriction: the service branches on the caller's role
+   * to decide *which* tickets to return (own vs. all), not whether to
+   * allow the call at all.
    */
   @Get()
   findMineOrAll(
@@ -65,9 +69,9 @@ export class TicketsController {
     return this.ticketsService.findByNumber(number, user);
   }
 
-  /** Only APPROVER/ADMIN can approve - either one may approve any ticket, no ownership/assignee check. */
+  /** Only ADMIN can approve now (APPROVER retired) - may approve any ticket, no ownership/assignee check. */
   @Patch(':id/approve')
-  @Roles(Role.APPROVER, Role.ADMIN)
+  @Roles(Role.ADMIN)
   approve(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ResponseBody<TicketResponse>> {

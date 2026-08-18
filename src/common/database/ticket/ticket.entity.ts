@@ -2,11 +2,15 @@ import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 import { TicketStatus } from './ticket-status.enum';
 
 /**
- * Maps the existing `tickets` table only (immutable baseline, same rule
- * as `UserEntity`/`RoleEntity`). `creator`/`assignee` stay plain integer
- * columns, not ORM relations — same reasoning as `RoleEntity.idUser`:
- * looked up explicitly by the repository, no relation object crossing
- * module boundaries.
+ * Maps the existing `tickets` table — see
+ * pcbox-api/documentation/pcbox.ticket-hub-db-deploy.md §11 for the
+ * migration that changed `assignee` from `INTEGER REFERENCES users(id)`
+ * to free text and added `informer`, once `users`/`roles` (and the FKs
+ * pointing at them) were dropped. `creator` stays a plain integer, not
+ * an ORM relation — but note it's no longer a local `users.id` either:
+ * it's `sub` from the auth-api-issued token (an internal_users id in a
+ * different table entirely), kept only for "find my own tickets"
+ * filtering, never joined against anything in this database anymore.
  *
  * `number` is application-computed (TicketsRepository.findMaxNumber +
  * 1, see TicketsService.create), not DB-generated: a `@Generated`
@@ -28,8 +32,23 @@ export class TicketEntity {
   @Column({ type: 'int' })
   creator!: number;
 
-  @Column({ type: 'int', nullable: true })
-  assignee!: number | null;
+  /**
+   * The creator's email, captured at creation time from the
+   * auth-api-issued token (`AuthenticatedUser.email`) — the only way
+   * left to put a human-readable name on `informer` for pcbox-api's
+   * notification, now that there's no local `users` table to look
+   * `creator` up in (see PcboxApiService.buildRequestBody).
+   */
+  @Column({ length: 30 })
+  informer!: string;
+
+  /**
+   * Free text now, typed manually by whoever creates the ticket — not
+   * a `users.id` foreign key anymore (see the entity's own doc comment
+   * for why). Still nullable: a ticket can exist unassigned.
+   */
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  assignee!: string | null;
 
   @Column({ length: 25 })
   department!: string;
@@ -80,7 +99,8 @@ export class TicketEntity {
 export class TicketEntityBuilder {
   private number?: number;
   private creator?: number;
-  private assignee: number | null = null;
+  private informer?: string;
+  private assignee: string | null = null;
   private department?: string;
   private subject?: string;
   private status?: TicketStatus;
@@ -98,7 +118,12 @@ export class TicketEntityBuilder {
     return this;
   }
 
-  withAssignee(assignee: number | null): this {
+  withInformer(informer: string): this {
+    this.informer = informer;
+    return this;
+  }
+
+  withAssignee(assignee: string | null): this {
     this.assignee = assignee;
     return this;
   }
@@ -140,6 +165,9 @@ export class TicketEntityBuilder {
     if (this.creator === undefined) {
       throw new Error('TicketEntity.Builder: creator is required');
     }
+    if (this.informer === undefined) {
+      throw new Error('TicketEntity.Builder: informer is required');
+    }
     if (this.department === undefined) {
       throw new Error('TicketEntity.Builder: department is required');
     }
@@ -156,6 +184,7 @@ export class TicketEntityBuilder {
     const entity = new TicketEntity();
     entity.number = this.number;
     entity.creator = this.creator;
+    entity.informer = this.informer;
     entity.assignee = this.assignee;
     entity.department = this.department;
     entity.subject = this.subject;
