@@ -4,15 +4,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TicketEntity } from './ticket/ticket.entity';
 import { TicketsRepository } from './ticket/tickets.repository';
 
-/**
- * `UserEntity`/`RoleEntity`/`UsersRepository`/`RolesRepository` are gone --
- * ticket-hub authenticates against auth-api now (JwtAuthGuard verifies
- * via JWKS), and the local `users`/`roles` tables had no other consumer
- * left once `TicketsService`'s assignee-role check and `PcboxApiService`'s
- * name lookups were retired (see `TicketEntity`'s doc comment for the
- * full history). The tables themselves are dropped by a migration, not
- * this module -- see pcbox-api/documentation/pcbox.ticket-hub-db-deploy.md §11.
- */
 @Global()
 @Module({
   imports: [
