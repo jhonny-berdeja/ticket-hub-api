@@ -14,17 +14,6 @@ import { IS_PUBLIC_KEY } from './public.decorator';
 const MISSING_TOKEN_MESSAGE = 'Missing or malformed bearer token';
 const INVALID_TOKEN_MESSAGE = 'Invalid or expired token';
 
-/**
- * Registered globally (see AppModule's APP_GUARD providers) — every
- * route authenticates by default. `@Public()` is the one explicit
- * escape hatch (used only by `POST /auth/login` today -- see that
- * route's own comment for why it's now dead code pending removal in a
- * later phase of this migration). Verifies the
- * `Authorization: Bearer <token>` header against auth-api's RS256
- * public key, looked up by the token's own `kid` header in
- * `JwksClientService`'s cache -- ticket-hub-api itself signs nothing
- * anymore; auth-api is the only issuer.
- */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
