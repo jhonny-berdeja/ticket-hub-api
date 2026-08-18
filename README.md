@@ -48,8 +48,8 @@ at boot if any is missing).
 
 `pcbox-api-notification-credentials` does not exist yet — creating it
 in-cluster is one of the manual setup steps for the `infra-hub` deploy
-pipeline (see `infra-hub/apps/ticket-hub-api/` and pcbox-api's
-`documentation/pcbox.ticket-hub-db-deploy.md`, step 9). There's no
+pipeline (see `infra-hub/apps/ticket-hub-api/` and
+`infra-hub/databases/ticket-hub-db.md`, step 9). There's no
 Secret of this app's own anymore — it doesn't sign or verify anything
 with a locally-held value, only `AUTH_API_URL` (a plain value, not a
 Secret) to poll auth-api's JWKS.
