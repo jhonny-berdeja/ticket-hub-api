@@ -1,26 +1,6 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 import { TicketStatus } from './ticket-status.enum';
 
-/**
- * Maps the existing `tickets` table — see
- * pcbox-api/documentation/pcbox.ticket-hub-db-deploy.md §11 for the
- * migration that changed `assignee` from `INTEGER REFERENCES users(id)`
- * to free text and added `informer`, once `users`/`roles` (and the FKs
- * pointing at them) were dropped. `creator` stays a plain integer, not
- * an ORM relation — but note it's no longer a local `users.id` either:
- * it's `sub` from the auth-api-issued token (an internal_users id in a
- * different table entirely), kept only for "find my own tickets"
- * filtering, never joined against anything in this database anymore.
- *
- * `number` is application-computed (TicketsRepository.findMaxNumber +
- * 1, see TicketsService.create), not DB-generated: a `@Generated`
- * secondary column relies on AUTOINCREMENT in SQLite, which SQLite only
- * allows on an INTEGER PRIMARY KEY - it cannot coexist with `id`
- * already holding that role, so it can't work identically against both
- * the real Postgres column and the e2e in-memory SQLite DB. The app
- * prefixes it with `TK-` only at the response boundary (see
- * TicketMapper.toResponse), never stored with the prefix.
- */
 @Entity({ name: 'tickets' })
 export class TicketEntity {
   @PrimaryGeneratedColumn()
@@ -32,21 +12,9 @@ export class TicketEntity {
   @Column({ type: 'int' })
   creator!: number;
 
-  /**
-   * The creator's email, captured at creation time from the
-   * auth-api-issued token (`AuthenticatedUser.email`) — the only way
-   * left to put a human-readable name on `informer` for pcbox-api's
-   * notification, now that there's no local `users` table to look
-   * `creator` up in (see PcboxApiService.buildRequestBody).
-   */
   @Column({ length: 30 })
   informer!: string;
 
-  /**
-   * Free text now, typed manually by whoever creates the ticket — not
-   * a `users.id` foreign key anymore (see the entity's own doc comment
-   * for why). Still nullable: a ticket can exist unassigned.
-   */
   @Column({ type: 'varchar', length: 100, nullable: true })
   assignee!: string | null;
 
@@ -62,10 +30,6 @@ export class TicketEntity {
   @Column({ length: 200 })
   description!: string;
 
-  // `type: 'varchar'` explicit for the same reason as RoleEntity.rol:
-  // TypeORM infers a nullable string column as generic `Object` from TS
-  // reflection when omitted, which `better-sqlite3` (the e2e in-memory
-  // DB) rejects outright.
   @Column({
     name: 'code_ansible',
     type: 'varchar',
@@ -74,19 +38,6 @@ export class TicketEntity {
   })
   codeAnsible!: string | null;
 
-  /**
-   * pcbox-api's full answer to the `POST /pcbox` call
-   * `ApproveTicketService` makes right after approval — `msg` + the
-   * execution outcome + the complete stdout/stderr, or a failure
-   * description if that call didn't go through. `text`, not a bounded
-   * `varchar`: a playbook's stdout has no predictable upper bound.
-   * `null` until a ticket is actually approved — same
-   * "business-mandatory, DB-nullable" reasoning as `codeAnsible`
-   * becoming mandatory at the DTO level without a NOT NULL here (see
-   * CreateTicketDto's own comment): adding NOT NULL later would need a
-   * migration for every row that predates this column, this way it
-   * doesn't.
-   */
   @Column({ type: 'text', nullable: true })
   response!: string | null;
 
@@ -95,7 +46,6 @@ export class TicketEntity {
   }
 }
 
-/** Fluent builder for `TicketEntity` — mirrors `UserEntityBuilder`'s pattern. `id` is DB-generated, never settable here; `number` IS settable — it's computed by the caller (TicketsService.create), not the DB. */
 export class TicketEntityBuilder {
   private number?: number;
   private creator?: number;

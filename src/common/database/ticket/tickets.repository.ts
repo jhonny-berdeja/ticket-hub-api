@@ -16,7 +16,6 @@ export class TicketsRepository {
     return this.repository.save(entity);
   }
 
-  /** Powers TicketsService.create's number = max + 1 — `null` when the table is empty (no tickets yet). */
   async findMaxNumber(): Promise<number | null> {
     return this.repository.maximum('number');
   }
@@ -37,7 +36,6 @@ export class TicketsRepository {
     return this.repository.find();
   }
 
-  /** Re-reads via `findById` right after `update` (not the merged input) so the returned entity always reflects exactly what the DB now holds. */
   async updateStatus(id: number, status: TicketStatus): Promise<TicketEntity> {
     await this.repository.update(id, { status });
     const updated = await this.findById(id);
@@ -49,7 +47,6 @@ export class TicketsRepository {
     return updated;
   }
 
-  /** Same re-read reasoning as `updateStatus`. Called once, right after approval, with pcbox-api's summarized answer (or a failure description) — see `ApproveTicketService`/`PcboxApiService`. */
   async updateResponse(id: number, response: string): Promise<TicketEntity> {
     await this.repository.update(id, { response });
     const updated = await this.findById(id);
