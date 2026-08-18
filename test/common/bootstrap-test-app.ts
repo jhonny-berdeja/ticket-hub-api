@@ -20,10 +20,10 @@ export interface TestApp {
 }
 
 /**
- * Boots a real Nest app for e2e specs — global `ConfigModule` (with a test
- * `JWT_SECRET`) + the shared in-memory DB, plus whatever feature modules the
- * caller needs. Mirrors `main.ts`'s `ValidationPipe` setup so validation
- * behaves the same as it does in production.
+ * Boots a real Nest app for e2e specs — global `ConfigModule` + the shared
+ * in-memory DB, plus whatever feature modules the caller needs. Mirrors
+ * `main.ts`'s `ValidationPipe` setup so validation behaves the same as it
+ * does in production.
  *
  * Also re-registers JwtAuthGuard/RolesGuard as APP_GUARD here: this
  * harness builds its own TestingModule instead of importing the real
@@ -53,8 +53,6 @@ export interface TestApp {
 export async function bootstrapTestApp(
   imports: NonNullable<ModuleMetadata['imports']>,
 ): Promise<TestApp> {
-  process.env.JWT_SECRET = 'test-secret';
-
   const moduleFixture: TestingModule = await Test.createTestingModule({
     imports: [
       ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),

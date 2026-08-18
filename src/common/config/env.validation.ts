@@ -44,16 +44,6 @@ export class EnvironmentVariables {
   DATABASE_NAME!: string;
 
   /**
-   * Still read by `AuthModule`'s `jwtModule` for the now-dead
-   * `AuthService.login` sign call (see `AuthController.login`'s
-   * comment) -- `JwtAuthGuard` no longer uses it at all, it verifies
-   * against auth-api's RS256 public key instead.
-   */
-  @IsString()
-  @IsNotEmpty()
-  JWT_SECRET!: string;
-
-  /**
    * In-cluster base URL of auth-api, e.g.
    * `http://auth-api.auth-api.svc.cluster.local:3000` -- `JwksClientService`
    * polls `${AUTH_API_URL}/.well-known/jwks.json` every 5 minutes to

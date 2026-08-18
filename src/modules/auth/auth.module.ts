@@ -1,6 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwksClientService } from './jwks-client.service';
@@ -15,21 +13,12 @@ import { RolesGuard } from './guards/roles.guard';
  * `AuthModule`); `AuthModule` never imports `UsersModule` back, so this
  * stays acyclic.
  *
- * `jwtModule` still exists solely for `AuthService.login`'s (now-dead,
- * see `AuthController.login`'s comment) signing call -- `JwtAuthGuard`
- * no longer depends on `JwtService` at all, it verifies via
- * `JwksClientService` instead, so `jwtModule` is imported but not
- * re-exported anymore: nothing outside this module needs it.
+ * No `JwtModule` here anymore: that was only for the now-removed local
+ * `login`'s signing call. `JwtAuthGuard` never depended on `JwtService`
+ * at all -- it verifies via `JwksClientService`, fetching auth-api's
+ * public key instead of holding any secret of its own.
  */
-const jwtModule = JwtModule.registerAsync({
-  inject: [ConfigService],
-  useFactory: (configService: ConfigService) => ({
-    secret: configService.get<string>('JWT_SECRET'),
-  }),
-});
-
 @Module({
-  imports: [jwtModule],
   controllers: [AuthController],
   providers: [AuthService, JwtAuthGuard, RolesGuard, JwksClientService],
   // Exported (not just declared) so that when a guard class is used

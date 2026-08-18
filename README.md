@@ -40,16 +40,19 @@ at boot if any is missing).
 | `DATABASE_HOST` | Yes | literal `env:` → `ticket-hub-db.ticket-hub.svc.cluster.local` | Postgres Service DNS name |
 | `DATABASE_PORT` | Yes | literal `env:` → `5432` | Postgres port |
 | `DATABASE_NAME` | Yes | literal `env:` → `ticket-hub-db` | Database name |
-| `JWT_SECRET` | Yes | `secretRef: ticket-hub-api-credentials` | Secret used to sign/verify login JWTs (1h expiry) |
+| `AUTH_API_URL` | Yes | literal `env:` → `http://auth-api.auth-api.svc.cluster.local:3000` | Base URL of auth-api, polled every 5 min for its JWKS (`JwksClientService`) — the RS256 key every request's bearer token is verified against |
 | `PORT` | Yes | literal `env:` → `3000` | HTTP port the Nest app listens on |
 | `LOG_LEVEL` | Yes | literal `env:` → `info` | Minimum pino log level (`trace`/`debug`/`info`/`warn`/`error`/`fatal`) |
 | `PCBOX_API_URL` | Yes | literal `env:` → `http://pcbox-api.pcbox-api.svc.cluster.local:3000` | Base URL of pcbox-api, called by `ApproveTicketService` right after a ticket is approved |
 | `PCBOX_API_ADMIN_KEY` | Yes | `secretRef: pcbox-api-notification-credentials` | Shared secret sent as `x-admin-api-key` — must match pcbox-api's own `ADMIN_API_KEY` |
 
-`ticket-hub-api-credentials` and `pcbox-api-notification-credentials` do not
-exist yet — creating them in-cluster is one of the manual setup steps for the
-`infra-hub` deploy pipeline (see `infra-hub/apps/ticket-hub-api/` and
-pcbox-api's `documentation/pcbox.ticket-hub-db-deploy.md`, step 9).
+`pcbox-api-notification-credentials` does not exist yet — creating it
+in-cluster is one of the manual setup steps for the `infra-hub` deploy
+pipeline (see `infra-hub/apps/ticket-hub-api/` and pcbox-api's
+`documentation/pcbox.ticket-hub-db-deploy.md`, step 9). There's no
+Secret of this app's own anymore — it doesn't sign or verify anything
+with a locally-held value, only `AUTH_API_URL` (a plain value, not a
+Secret) to poll auth-api's JWKS.
 
 ## Manual verification (once deployed in-cluster)
 
@@ -62,7 +65,7 @@ against a mocked repository (`getRepositoryToken(User)` / a fake
 `UsersRepository`), never a real Postgres, by design (see "Environment
 variables" above). The checklist below cannot run today; it needs
 `infra-hub`'s deploy pipeline to have actually applied those manifests and
-the `ticket-hub-api-credentials` Secret to exist in-cluster first — it is
+`pcbox-api-notification-credentials` to exist in-cluster first — it is
 written so that first real deploy can confirm the DB round trip without
 re-deriving these steps from the spec/design.
 
@@ -84,11 +87,18 @@ microk8s kubectl logs -n ticket-hub deployment/ticket-hub-api
 
 Both `ticket-hub-db-...` and `ticket-hub-api-...` should show `Running`. The
 API log should show Nest's normal route map at boot (`Mapped {/users, POST}`,
-`Mapped {/auth/login, POST}`) with no `Missing required environment
+`Mapped {/auth/me, GET}`) with no `Missing required environment
 variable(s)` error — if that error appears, the Deployment/Secret wiring is
-missing one of the 8 vars in the table above.
+missing one of the vars in the table above.
 
-### 2. Exercise `POST /users` and `POST /auth/login` directly against the API
+### 2. Exercise `POST /users` directly against the API
+
+`/auth/login` doesn't exist anymore — ticket-hub authenticates against
+auth-api's `POST /internal-users/login` instead (`X-Application-Name:
+ticket-hub`), and this app only verifies the resulting token (see
+`src/modules/auth/guards/jwt-auth.guard.ts`). Getting a real bearer token
+to test `GET /auth/me` or any guarded route this way means logging in
+through auth-api first, not through anything exposed here.
 
 Port-forward the API Service to the workstation (or `kubectl exec` into any
 Pod in the namespace and `curl` the in-cluster DNS name directly — either
@@ -106,27 +116,12 @@ curl -i -X POST http://localhost:3000/users \
   -d '{"name":"Ana","lastname":"Perez","email":"smoke-test@example.com","password":"secret1"}'
 ```
 
-Expected: `201 Created`, JSON body `{"msg":"User created successfully","data":{"id":<number>,"name":"Ana","lastname":"Perez","email":"smoke-test@example.com"}}` — **no `password` key present**.
-
-```bash
-curl -i -X POST http://localhost:3000/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"smoke-test@example.com","password":"secret1"}'
-```
-
-Expected: `200 OK`, JSON body `{"access_token":"<jwt>"}`. Decode the payload
-(e.g. `echo '<jwt-payload-part>' | base64 -d`) and confirm `exp - iat ==
-3600` (1 hour).
-
-```bash
-curl -i -X POST http://localhost:3000/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"smoke-test@example.com","password":"wrong-password"}'
-```
-
-Expected: `401 Unauthorized`, `{"message":"Invalid credentials"}` — same
-message as an unknown email, confirmed by repeating with a nonexistent
-email.
+Expected: `401 Unauthorized` — `POST /users` requires ADMIN now, same as
+every other route but `GET /auth/me`, and this curl carries no bearer
+token. Confirming that is the actual smoke test here: it proves
+`JwtAuthGuard`/`JwksClientService` are wired and rejecting unauthenticated
+requests, not that user creation itself works end-to-end (that needs a
+real auth-api-issued ADMIN token, out of scope for this quick check).
 
 ### 3. Confirm the schema was not touched
 
