@@ -5,11 +5,6 @@ import { TicketEntity } from './ticket/ticket.entity';
 import { TicketsRepository } from './ticket/tickets.repository';
 
 /**
- * `EnvModule` is not imported here: it's `@Global()` too, so once it loads
- * in `AppModule`, `ConfigService` is already injectable everywhere —
- * `inject: [ConfigService]` below works without a local import, same reason
- * `AuthModule` doesn't import this module to get `TicketsRepository`.
- *
  * `UserEntity`/`RoleEntity`/`UsersRepository`/`RolesRepository` are gone --
  * ticket-hub authenticates against auth-api now (JwtAuthGuard verifies
  * via JWKS), and the local `users`/`roles` tables had no other consumer
