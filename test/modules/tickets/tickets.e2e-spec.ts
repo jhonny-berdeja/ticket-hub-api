@@ -9,6 +9,14 @@ import { seedAuthenticatedUser } from '../../common/seed-authenticated-user';
 const CREATOR_EMAIL = 'creator@example.com';
 const OTHER_USER_EMAIL = 'other-user@example.com';
 
+const PCBOX_API_TOKEN = 'test-pcbox-api-token';
+
+function authApiLoginSuccessResponse(): Response {
+  return new Response(JSON.stringify({ access_token: PCBOX_API_TOKEN }), {
+    status: 200,
+  });
+}
+
 function pcboxApiSuccessResponse(): Response {
   return new Response(
     JSON.stringify({
@@ -24,6 +32,23 @@ function pcboxApiSuccessResponse(): Response {
     }),
     { status: 201 },
   );
+}
+
+/**
+ * Routes the mocked fetch by URL: auth-api's login vs. pcbox-api's own
+ * endpoint. `PcboxApiConnector` always calls `fetch` with a plain
+ * string URL, never a `Request`/`URL` instance, so narrowing the
+ * parameter type here (rather than the wider `RequestInfo | URL` jest
+ * infers) is safe and avoids stringifying something that isn't a string.
+ */
+function mockPcboxApiSuccess(fetchSpy: jest.SpiedFunction<typeof fetch>) {
+  fetchSpy.mockImplementation((url: string) => {
+    return Promise.resolve(
+      url.endsWith('/apps-users/login')
+        ? authApiLoginSuccessResponse()
+        : pcboxApiSuccessResponse(),
+    );
+  });
 }
 
 /**
@@ -52,7 +77,10 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
 
   beforeAll(async () => {
     process.env.PCBOX_API_URL = 'http://pcbox-api.test';
-    process.env.PCBOX_API_ADMIN_KEY = 'test-pcbox-admin-key';
+    process.env.AUTH_API_URL = 'http://auth-api.test';
+    process.env.PCBOX_API_APPLICATION_NAME = 'pcbox-api';
+    process.env.PCBOX_API_CLIENT_ID = 'test-client-id';
+    process.env.PCBOX_API_CLIENT_SECRET = 'test-client-secret';
 
     ({ app } = await bootstrapTestApp([TicketsModule]));
 
@@ -152,7 +180,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
   });
 
   it('happy path: ADMIN approves a ticket, and pcbox-api gets notified', async () => {
-    fetchSpy.mockResolvedValue(pcboxApiSuccessResponse());
+    mockPcboxApiSuccess(fetchSpy);
 
     const response = await request(app.getHttpServer())
       .patch('/tickets/1/approve')
@@ -174,11 +202,25 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     );
 
     expect(fetchSpy).toHaveBeenCalledWith(
+      'http://auth-api.test/apps-users/login',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'X-Application-Name': 'pcbox-api',
+        }) as unknown,
+        body: JSON.stringify({
+          clienteId: 'test-client-id',
+          clienteSecret: 'test-client-secret',
+        }),
+      }) as unknown,
+    );
+
+    expect(fetchSpy).toHaveBeenCalledWith(
       'http://pcbox-api.test/pcbox',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
-          'x-admin-api-key': 'test-pcbox-admin-key',
+          Authorization: `Bearer ${PCBOX_API_TOKEN}`,
         }) as unknown,
         body: JSON.stringify({
           ticketNumber: 1,

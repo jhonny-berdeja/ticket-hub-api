@@ -70,16 +70,28 @@ export class EnvironmentVariables {
   PCBOX_API_URL!: string;
 
   /**
-   * Shared secret sent as `x-admin-api-key` when calling pcbox-api —
-   * must hold the exact same value as pcbox-api's own `ADMIN_API_KEY`.
-   * Provisioned as a separate Secret in this namespace (Kubernetes
-   * Secrets don't cross namespaces) — see pcbox-api's own
-   * documentation/pcbox.ticket-hub-db-deploy.md, step 9 (deploy docs for
-   * the whole ecosystem live in that repo, not here).
+   * The application PcboxApiConnector logs into on auth-api
+   * (`X-Application-Name`) before calling pcbox-api -- must match
+   * whatever pcbox-api was registered as in auth-api's `applications`
+   * table (see the data migration in iam).
    */
   @IsString()
   @IsNotEmpty()
-  PCBOX_API_ADMIN_KEY!: string;
+  PCBOX_API_APPLICATION_NAME!: string;
+
+  /**
+   * apps-user credentials (`clienteId`/`clienteSecret`) PcboxApiConnector
+   * logs in with against auth-api's `POST /apps-users/login`, replacing
+   * the old shared `PCBOX_API_ADMIN_KEY` -- see the connector's own
+   * history. Both provisioned from the same Secret.
+   */
+  @IsString()
+  @IsNotEmpty()
+  PCBOX_API_CLIENT_ID!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  PCBOX_API_CLIENT_SECRET!: string;
 }
 
 /**
