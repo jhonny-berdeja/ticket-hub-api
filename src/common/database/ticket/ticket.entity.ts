@@ -1,5 +1,7 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 import { TicketStatus } from './ticket-status.enum';
+import { TicketType } from './ticket-type.enum';
+import { OperationType } from './operation-type.enum';
 
 @Entity({ name: 'tickets' })
 export class TicketEntity {
@@ -8,6 +10,9 @@ export class TicketEntity {
 
   @Column({ type: 'int' })
   number!: number;
+
+  @Column({ name: 'ticket_type', type: 'varchar', length: 10 })
+  ticketType!: TicketType;
 
   @Column({ type: 'int' })
   creator!: number;
@@ -41,6 +46,31 @@ export class TicketEntity {
   @Column({ type: 'text', nullable: true })
   response!: string | null;
 
+  @Column({ name: 'db_namespace', type: 'varchar', length: 63, nullable: true })
+  dbNamespace!: string | null;
+
+  @Column({
+    name: 'db_deployment',
+    type: 'varchar',
+    length: 63,
+    nullable: true,
+  })
+  dbDeployment!: string | null;
+
+  @Column({ name: 'db_name', type: 'varchar', length: 63, nullable: true })
+  dbName!: string | null;
+
+  @Column({
+    name: 'operation_type',
+    type: 'varchar',
+    length: 10,
+    nullable: true,
+  })
+  operationType!: OperationType | null;
+
+  @Column({ name: 'sql_code', type: 'varchar', length: 5000, nullable: true })
+  sqlCode!: string | null;
+
   static builder(): TicketEntityBuilder {
     return new TicketEntityBuilder();
   }
@@ -55,8 +85,14 @@ export class TicketEntityBuilder {
   private subject?: string;
   private status?: TicketStatus;
   private description?: string;
+  private ticketType?: TicketType;
   private codeAnsible: string | null = null;
   private response: string | null = null;
+  private dbNamespace: string | null = null;
+  private dbDeployment: string | null = null;
+  private dbName: string | null = null;
+  private operationType: OperationType | null = null;
+  private sqlCode: string | null = null;
 
   withNumber(number: number): this {
     this.number = number;
@@ -98,6 +134,11 @@ export class TicketEntityBuilder {
     return this;
   }
 
+  withTicketType(ticketType: TicketType): this {
+    this.ticketType = ticketType;
+    return this;
+  }
+
   withCodeAnsible(codeAnsible: string | null): this {
     this.codeAnsible = codeAnsible;
     return this;
@@ -105,6 +146,31 @@ export class TicketEntityBuilder {
 
   withResponse(response: string | null): this {
     this.response = response;
+    return this;
+  }
+
+  withDbNamespace(dbNamespace: string | null): this {
+    this.dbNamespace = dbNamespace;
+    return this;
+  }
+
+  withDbDeployment(dbDeployment: string | null): this {
+    this.dbDeployment = dbDeployment;
+    return this;
+  }
+
+  withDbName(dbName: string | null): this {
+    this.dbName = dbName;
+    return this;
+  }
+
+  withOperationType(operationType: OperationType | null): this {
+    this.operationType = operationType;
+    return this;
+  }
+
+  withSqlCode(sqlCode: string | null): this {
+    this.sqlCode = sqlCode;
     return this;
   }
 
@@ -130,6 +196,9 @@ export class TicketEntityBuilder {
     if (this.description === undefined) {
       throw new Error('TicketEntity.Builder: description is required');
     }
+    if (this.ticketType === undefined) {
+      throw new Error('TicketEntity.Builder: ticketType is required');
+    }
 
     const entity = new TicketEntity();
     entity.number = this.number;
@@ -140,8 +209,14 @@ export class TicketEntityBuilder {
     entity.subject = this.subject;
     entity.status = this.status;
     entity.description = this.description;
+    entity.ticketType = this.ticketType;
     entity.codeAnsible = this.codeAnsible;
     entity.response = this.response;
+    entity.dbNamespace = this.dbNamespace;
+    entity.dbDeployment = this.dbDeployment;
+    entity.dbName = this.dbName;
+    entity.operationType = this.operationType;
+    entity.sqlCode = this.sqlCode;
     return entity;
   }
 }

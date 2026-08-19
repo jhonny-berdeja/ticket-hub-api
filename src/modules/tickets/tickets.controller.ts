@@ -18,12 +18,15 @@ import { CreateTicketDto } from './dto/create-ticket.dto';
 import { TicketsService } from './tickets.service';
 import { ApproveTicketService } from './approve-ticket.service';
 import { TicketResponse } from './ticket-response';
+import { PcboxApiService } from '../pcbox-api/pcbox-api.service';
+import { DbTarget } from '../pcbox-api/pcbox-api.connector';
 
 @Controller('tickets')
 export class TicketsController {
   constructor(
     private readonly ticketsService: TicketsService,
     private readonly approveTicketService: ApproveTicketService,
+    private readonly pcboxApiService: PcboxApiService,
   ) {}
 
   @Post()
@@ -48,6 +51,16 @@ export class TicketsController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse>> {
     return this.ticketsService.findByNumber(number, user);
+  }
+
+  /** Proxies pcbox-api's allowlist so the create-ticket form's dropdown never hardcodes it — see design's "anti-drift" note. */
+  @Get('db-targets')
+  async getDbTargets(): Promise<ResponseBody<DbTarget[]>> {
+    const targets = await this.pcboxApiService.fetchDbTargets();
+    return ResponseBody.builder<DbTarget[]>()
+      .withMsg('Allowlisted database targets retrieved successfully')
+      .withData(targets)
+      .build();
   }
 
   @Patch(':id/approve')

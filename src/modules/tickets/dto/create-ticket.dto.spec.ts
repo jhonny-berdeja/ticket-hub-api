@@ -1,0 +1,67 @@
+import { plainToInstance } from 'class-transformer';
+import { validate, ValidationError } from 'class-validator';
+import { CreateTicketDto } from './create-ticket.dto';
+import { TicketType } from '../../../common/database/ticket/ticket-type.enum';
+import { OperationType } from '../../../common/database/ticket/operation-type.enum';
+
+function validateDto(
+  payload: Record<string, unknown>,
+): Promise<ValidationError[]> {
+  const instance = plainToInstance(CreateTicketDto, payload);
+  return validate(instance);
+}
+
+describe('CreateTicketDto — ticketType-conditional validation', () => {
+  const baseAnsible = {
+    assignee: 'Jane',
+    department: 'Datacenter',
+    subject: 'Restart pod',
+    description: 'Please restart',
+    ticketType: TicketType.ANSIBLE,
+  };
+
+  const baseDatabase = {
+    assignee: 'Jane',
+    department: 'Datacenter',
+    subject: 'Read row',
+    description: 'Please read',
+    ticketType: TicketType.DATABASE,
+    namespace: 'pcbox-api',
+    deployment: 'pcbox-db',
+    dbName: 'pcbox-db',
+    operationType: OperationType.LECTURA,
+    sqlCode: 'SELECT 1;',
+  };
+
+  it('rejects a DATABASE ticket missing sqlCode with a validation error', async () => {
+    const { sqlCode: _omit, ...withoutSqlCode } = baseDatabase;
+    const errors = await validateDto(withoutSqlCode);
+    expect(errors.some((error) => error.property === 'sqlCode')).toBe(true);
+  });
+
+  it('rejects an ANSIBLE ticket missing codeAnsible with a validation error', async () => {
+    const errors = await validateDto(baseAnsible);
+    expect(errors.some((error) => error.property === 'codeAnsible')).toBe(true);
+  });
+
+  it('rejects sqlCode over the 5000-char cap with a validation error', async () => {
+    const errors = await validateDto({
+      ...baseDatabase,
+      sqlCode: 'a'.repeat(5001),
+    });
+    expect(errors.some((error) => error.property === 'sqlCode')).toBe(true);
+  });
+
+  it('accepts a valid DATABASE ticket with zero validation errors', async () => {
+    const errors = await validateDto(baseDatabase);
+    expect(errors).toHaveLength(0);
+  });
+
+  it('accepts a valid ANSIBLE ticket with zero validation errors', async () => {
+    const errors = await validateDto({
+      ...baseAnsible,
+      codeAnsible: '- hosts: all',
+    });
+    expect(errors).toHaveLength(0);
+  });
+});

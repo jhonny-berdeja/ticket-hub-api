@@ -120,8 +120,14 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
         subject: 'Servidor caído',
         status: 'CREATED',
         description: 'El servidor de prod no responde',
+        ticketType: 'ANSIBLE',
         codeAnsible: 'playbook: restart.yml',
         response: null,
+        namespace: null,
+        deployment: null,
+        dbName: null,
+        operationType: null,
+        sqlCode: null,
       },
     });
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -228,6 +234,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
           informer: CREATOR_EMAIL,
           approver: 'Ana Aprobadora',
           status: 'APPROVED',
+          ticketType: 'ANSIBLE',
           fileContent: 'playbook: restart.yml',
         }),
       }) as unknown,
@@ -249,6 +256,37 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     expect(body.data.response).toBe('pcbox-api unreachable: ECONNREFUSED');
   });
 
+  it("GET /tickets/db-targets proxies pcbox-api's allowlist verbatim", async () => {
+    const targets = [
+      {
+        namespace: 'ticket-hub',
+        deployment: 'ticket-hub-db',
+        dbName: 'ticket-hub-db',
+      },
+      { namespace: 'pcbox-api', deployment: 'pcbox-db', dbName: 'pcbox-db' },
+    ];
+    fetchSpy.mockImplementation((url: string) => {
+      if (url.endsWith('/apps-users/login')) {
+        return Promise.resolve(authApiLoginSuccessResponse());
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ msg: 'ok', data: targets }), {
+          status: 200,
+        }),
+      );
+    });
+
+    const response = await request(app.getHttpServer())
+      .get('/tickets/db-targets')
+      .set('Authorization', `Bearer ${creatorToken}`)
+      .expect(200);
+
+    expect(response.body).toEqual({
+      msg: 'Allowlisted database targets retrieved successfully',
+      data: targets,
+    });
+  });
+
   it('404s approving a ticket that does not exist', async () => {
     await request(app.getHttpServer())
       .patch('/tickets/999/approve')
@@ -256,5 +294,55 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
       .expect(404);
 
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('creates and approves a DATABASE ticket, forwarding the structured action to pcbox-api', async () => {
+    const createResponse = await request(app.getHttpServer())
+      .post('/tickets')
+      .set('Authorization', `Bearer ${creatorToken}`)
+      .send({
+        assignee: 'Ana Aprobadora',
+        department: 'Datacenter',
+        subject: 'Read a row',
+        description: 'Need to read one row',
+        ticketType: 'DATABASE',
+        namespace: 'pcbox-api',
+        deployment: 'pcbox-db',
+        dbName: 'pcbox-db',
+        operationType: 'LECTURA',
+        sqlCode: 'SELECT 1;',
+      })
+      .expect(201);
+
+    const createdBody = createResponse.body as {
+      data: { id: number; ticketType: string; sqlCode: string };
+    };
+    expect(createdBody.data.ticketType).toBe('DATABASE');
+    expect(createdBody.data.sqlCode).toBe('SELECT 1;');
+
+    mockPcboxApiSuccess(fetchSpy);
+
+    await request(app.getHttpServer())
+      .patch(`/tickets/${createdBody.data.id}/approve`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    const [, requestInit] = fetchSpy.mock.calls.find(
+      ([url]) => url === 'http://pcbox-api.test/pcbox',
+    )!;
+    const sentBody = JSON.parse(
+      (requestInit as RequestInit).body as string,
+    ) as {
+      ticketType: string;
+      database: { namespace: string; sqlCode: string };
+    };
+    expect(sentBody.ticketType).toBe('DATABASE');
+    expect(sentBody.database).toEqual({
+      namespace: 'pcbox-api',
+      deployment: 'pcbox-db',
+      dbName: 'pcbox-db',
+      operationType: 'LECTURA',
+      sqlCode: 'SELECT 1;',
+    });
   });
 });
