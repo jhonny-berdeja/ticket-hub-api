@@ -1,4 +1,6 @@
 import { TicketStatus } from '../../common/database/ticket/ticket-status.enum';
+import { TicketType } from '../../common/database/ticket/ticket-type.enum';
+import { OperationType } from '../../common/database/ticket/operation-type.enum';
 
 export interface TicketResponse {
   id: number;
@@ -10,6 +12,12 @@ export interface TicketResponse {
   subject: string;
   status: TicketStatus;
   description: string;
+  ticketType: TicketType;
   codeAnsible: string | null;
   response: string | null;
+  namespace: string | null;
+  deployment: string | null;
+  dbName: string | null;
+  operationType: OperationType | null;
+  sqlCode: string | null;
 }

@@ -1,5 +1,6 @@
 import { TicketEntity } from '../../common/database/ticket/ticket.entity';
 import { TicketStatus } from '../../common/database/ticket/ticket-status.enum';
+import { TicketType } from '../../common/database/ticket/ticket-type.enum';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { TicketResponse } from './ticket-response';
 
@@ -21,7 +22,13 @@ export class TicketMapper {
       .withSubject(dto.subject)
       .withStatus(TicketStatus.CREATED)
       .withDescription(dto.description)
-      .withCodeAnsible(dto.codeAnsible)
+      .withTicketType(dto.ticketType ?? TicketType.ANSIBLE)
+      .withCodeAnsible(dto.codeAnsible ?? null)
+      .withDbNamespace(dto.namespace ?? null)
+      .withDbDeployment(dto.deployment ?? null)
+      .withDbName(dto.dbName ?? null)
+      .withOperationType(dto.operationType ?? null)
+      .withSqlCode(dto.sqlCode ?? null)
       .build();
   }
 
@@ -36,8 +43,14 @@ export class TicketMapper {
       subject: ticket.subject,
       status: ticket.status,
       description: ticket.description,
+      ticketType: ticket.ticketType,
       codeAnsible: ticket.codeAnsible,
       response: ticket.response,
+      namespace: ticket.dbNamespace,
+      deployment: ticket.dbDeployment,
+      dbName: ticket.dbName,
+      operationType: ticket.operationType,
+      sqlCode: ticket.sqlCode,
     };
   }
 }

@@ -1,13 +1,33 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+export interface PcboxApiDatabaseAction {
+  namespace: string;
+  deployment: string;
+  dbName: string;
+  operationType: string;
+  sqlCode: string;
+}
+
 export interface PcboxApiCreateAdministrationBody {
   ticketNumber: number;
   department: string;
   approver: string;
   informer: string;
   status: string;
-  fileContent: string;
+  ticketType: string;
+  fileContent?: string;
+  database?: PcboxApiDatabaseAction;
+}
+
+export interface DbTarget {
+  namespace: string;
+  deployment: string;
+  dbName: string;
+}
+
+interface DbTargetsResponse {
+  data: DbTarget[];
 }
 
 interface AuthApiLoginResponse {
@@ -47,6 +67,25 @@ export class PcboxApiConnector {
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  /** Proxies pcbox-api's `GET /pcbox/db-targets` — the single source of truth for the DATABASE-ticket allowlist (see design's "anti-drift" note). */
+  async fetchDbTargets(): Promise<DbTarget[]> {
+    const accessToken = await this.login();
+
+    const baseUrl = this.configService.get<string>('PCBOX_API_URL')!;
+    const response = await fetch(`${baseUrl}/pcbox/db-targets`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(PcboxApiConnector.LOGIN_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch db-targets: status ${response.status}`);
+    }
+
+    const body = (await response.json()) as DbTargetsResponse;
+    return body.data;
   }
 
   private async login(): Promise<string> {

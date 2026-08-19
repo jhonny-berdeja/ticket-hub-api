@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { TicketEntity } from '../../common/database/ticket/ticket.entity';
+import { TicketType } from '../../common/database/ticket/ticket-type.enum';
 import {
+  DbTarget,
   PcboxApiConnector,
   PcboxApiCreateAdministrationBody,
 } from './pcbox-api.connector';
@@ -42,6 +44,11 @@ export class PcboxApiService {
     }
   }
 
+  /** Proxied by `TicketsController` at `GET /tickets/db-targets` — see design's "anti-drift" note (one source of truth in pcbox-api). */
+  fetchDbTargets(): Promise<DbTarget[]> {
+    return this.pcboxApiConnector.fetchDbTargets();
+  }
+
   private buildRequestBody(
     ticket: TicketEntity,
   ): PcboxApiCreateAdministrationBody | null {
@@ -49,12 +56,30 @@ export class PcboxApiService {
       return null;
     }
 
-    return {
+    const base = {
       ticketNumber: ticket.number,
       department: ticket.department,
       informer: ticket.informer,
       approver: ticket.assignee,
       status: ticket.status,
+      ticketType: ticket.ticketType,
+    };
+
+    if (ticket.ticketType === TicketType.DATABASE) {
+      return {
+        ...base,
+        database: {
+          namespace: ticket.dbNamespace ?? '',
+          deployment: ticket.dbDeployment ?? '',
+          dbName: ticket.dbName ?? '',
+          operationType: ticket.operationType ?? '',
+          sqlCode: ticket.sqlCode ?? '',
+        },
+      };
+    }
+
+    return {
+      ...base,
       fileContent: ticket.codeAnsible ?? '',
     };
   }
