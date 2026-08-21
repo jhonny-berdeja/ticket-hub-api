@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { DatacenterTicketsRepository } from '../../common/database/ticket/datacenter-tickets.repository';
 import { DatabaseTicketsRepository } from '../../common/database/ticket/database-tickets.repository';
 import { Role } from '../../common/database/role/role.enum';
 import { ResponseBody } from '../../common/dto/response-body.dto';
@@ -9,20 +10,31 @@ import { TicketResponse } from './ticket-response';
 const ADMIN_ROLE_NAME: string = Role.ADMIN;
 
 /**
- * `TicketsService.findMineOrAll` extracted here, scoped to
- * `database_tickets` alone — deliberately NOT shared with
- * `ListAnsibleTicketsService` even though the two are nearly identical,
- * so each list flow can be read and changed in isolation. See
- * `project-structure-conventions.md`, "Handlers en el service general vs.
- * service dedicado".
+ * `TicketsService.findMineOrAll` consolidated here: one method per ticket
+ * kind, each scoped to its own repository/mapper pair. `isAdmin` is shared
+ * since it's the same trivial one-line auth check for both.
  */
 @Injectable()
-export class ListDatabaseTicketsService {
+export class ListTicketsService {
   constructor(
+    private readonly datacenterTicketsRepository: DatacenterTicketsRepository,
     private readonly databaseTicketsRepository: DatabaseTicketsRepository,
   ) {}
 
-  async findMineOrAll(
+  async findAnsibleMineOrAll(
+    user: AuthenticatedUser,
+  ): Promise<ResponseBody<TicketResponse[]>> {
+    const tickets = this.isAdmin(user)
+      ? await this.datacenterTicketsRepository.findAll()
+      : await this.datacenterTicketsRepository.findByInformer(user.email);
+
+    return ResponseBody.builder<TicketResponse[]>()
+      .withMsg('Tickets retrieved successfully')
+      .withData(tickets.map((ticket) => TicketMapper.toAnsibleResponse(ticket)))
+      .build();
+  }
+
+  async findDatabaseMineOrAll(
     user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse[]>> {
     const tickets = this.isAdmin(user)

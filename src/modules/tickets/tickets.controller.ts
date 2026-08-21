@@ -17,11 +17,9 @@ import { ResponseBody } from '../../common/dto/response-body.dto';
 import { CreateAnsibleTicketDto } from './dto/create-ansible-ticket.dto';
 import { CreateDatabaseTicketDto } from './dto/create-database-ticket.dto';
 import { ApproveTicketService } from './approve-ticket.service';
-import { CreateAnsibleTicketService } from './create-ansible-ticket.service';
-import { CreateDatabaseTicketService } from './create-database-ticket.service';
+import { CreateTicketService } from './create-ticket.service';
 import { FindTicketByNumberService } from './find-ticket-by-number.service';
-import { ListAnsibleTicketsService } from './list-ansible-tickets.service';
-import { ListDatabaseTicketsService } from './list-database-tickets.service';
+import { ListTicketsService } from './list-tickets.service';
 import { TicketResponse } from './ticket-response';
 import { PcboxApiService } from '../pcbox-api/pcbox-api.service';
 import { DbTarget } from '../pcbox-api/pcbox-api.connector';
@@ -32,11 +30,9 @@ import { InternalUser } from '../iam-api/iam-api.connector';
 export class TicketsController {
   constructor(
     private readonly approveTicketService: ApproveTicketService,
-    private readonly createAnsibleTicketService: CreateAnsibleTicketService,
-    private readonly createDatabaseTicketService: CreateDatabaseTicketService,
+    private readonly createTicketService: CreateTicketService,
     private readonly findTicketByNumberService: FindTicketByNumberService,
-    private readonly listAnsibleTicketsService: ListAnsibleTicketsService,
-    private readonly listDatabaseTicketsService: ListDatabaseTicketsService,
+    private readonly listTicketsService: ListTicketsService,
     private readonly pcboxApiService: PcboxApiService,
     private readonly iamApiService: IamApiService,
   ) {}
@@ -47,7 +43,7 @@ export class TicketsController {
     @Body() dto: CreateAnsibleTicketDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse>> {
-    return this.createAnsibleTicketService.createAnsible(dto, user.email);
+    return this.createTicketService.createAnsible(dto, user.email);
   }
 
   @Post('database')
@@ -56,21 +52,21 @@ export class TicketsController {
     @Body() dto: CreateDatabaseTicketDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse>> {
-    return this.createDatabaseTicketService.createDatabase(dto, user.email);
+    return this.createTicketService.createDatabase(dto, user.email);
   }
 
   @Get('ansible')
   findAnsibleMineOrAll(
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse[]>> {
-    return this.listAnsibleTicketsService.findMineOrAll(user);
+    return this.listTicketsService.findAnsibleMineOrAll(user);
   }
 
   @Get('database')
   findDatabaseMineOrAll(
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse[]>> {
-    return this.listDatabaseTicketsService.findMineOrAll(user);
+    return this.listTicketsService.findDatabaseMineOrAll(user);
   }
 
   /**

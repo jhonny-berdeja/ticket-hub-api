@@ -9,7 +9,7 @@ import { TicketStatus } from './ticket-status.enum';
  * need namespace/deployment/dbName as caller-supplied input at approval
  * time, which can happen long after creation — this table is the only
  * place that can carry them across that gap. Ownership checks use
- * `informer` instead of the old `creator` (see `ListDatabaseTicketsService`/
+ * `informer` instead of the old `creator` (see `ListTicketsService`/
  * `FindTicketByNumberService`).
  */
 @Entity({ name: 'database_tickets' })

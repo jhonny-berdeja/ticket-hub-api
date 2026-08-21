@@ -1,11 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TicketsController } from './tickets.controller';
 import { ApproveTicketService } from './approve-ticket.service';
-import { CreateAnsibleTicketService } from './create-ansible-ticket.service';
-import { CreateDatabaseTicketService } from './create-database-ticket.service';
+import { CreateTicketService } from './create-ticket.service';
 import { FindTicketByNumberService } from './find-ticket-by-number.service';
-import { ListAnsibleTicketsService } from './list-ansible-tickets.service';
-import { ListDatabaseTicketsService } from './list-database-tickets.service';
+import { ListTicketsService } from './list-tickets.service';
 import { PcboxApiModule } from '../pcbox-api/pcbox-api.module';
 import { IamApiModule } from '../iam-api/iam-api.module';
 
@@ -14,11 +12,9 @@ import { IamApiModule } from '../iam-api/iam-api.module';
   controllers: [TicketsController],
   providers: [
     ApproveTicketService,
-    CreateAnsibleTicketService,
-    CreateDatabaseTicketService,
+    CreateTicketService,
     FindTicketByNumberService,
-    ListAnsibleTicketsService,
-    ListDatabaseTicketsService,
+    ListTicketsService,
   ],
 })
 export class TicketsModule {}
