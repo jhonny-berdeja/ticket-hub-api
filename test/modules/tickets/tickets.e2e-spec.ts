@@ -59,6 +59,13 @@ function mockPcboxApiSuccess(fetchSpy: jest.SpiedFunction<typeof fetch>) {
  * DEV/APPROVER are gone (see `TicketEntity`'s doc comment): any
  * authenticated user can create a ticket, only ADMIN approves, and
  * "own tickets vs. every ticket" now branches on ADMIN alone.
+ *
+ * Creation itself is covered by `tickets-ansible.e2e-spec.ts` and
+ * `tickets-database.e2e-spec.ts` — this suite only covers what stayed
+ * unified across both ticket types: listing, lookup-by-number, approval
+ * and the db-targets proxy. Fixture tickets here are created through
+ * `POST /tickets/ansible` since the type doesn't matter to what's under
+ * test.
  */
 describe('Tickets flow (e2e, in-memory DB)', () => {
   let app: INestApplication<App>;
@@ -67,7 +74,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
   let adminToken: string;
   let fetchSpy: jest.SpiedFunction<typeof fetch>;
 
-  const validTicketBody = () => ({
+  const validAnsibleTicketBody = () => ({
     assignee: 'Ana Aprobadora',
     department: 'Datacenter',
     subject: 'Servidor caído',
@@ -101,43 +108,25 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     fetchSpy.mockRestore();
   });
 
-  it('happy path: any authenticated user creates a ticket, numbered TK-1, status CREATED', async () => {
+  it('sets up ticket TK-1, created by creatorToken', async () => {
     const response = await request(app.getHttpServer())
-      .post('/tickets')
+      .post('/tickets/ansible')
       .set('Authorization', `Bearer ${creatorToken}`)
-      .send(validTicketBody())
+      .send(validAnsibleTicketBody())
       .expect(201);
 
-    expect(response.body).toEqual({
-      msg: 'Ticket created successfully',
-      data: {
-        id: expect.any(Number) as number,
-        number: 'TK-1',
-        creator: expect.any(Number) as number,
-        informer: CREATOR_EMAIL,
-        assignee: 'Ana Aprobadora',
-        department: 'Datacenter',
-        subject: 'Servidor caído',
-        status: 'CREATED',
-        description: 'El servidor de prod no responde',
-        ticketType: 'ANSIBLE',
-        codeAnsible: 'playbook: restart.yml',
-        response: null,
-        namespace: null,
-        deployment: null,
-        dbName: null,
-        sqlCode: null,
-      },
-    });
     expect(fetchSpy).not.toHaveBeenCalled();
+    expect(response.body).toMatchObject({
+      data: { number: 'TK-1', informer: CREATOR_EMAIL },
+    });
   });
 
   it('non-ADMIN sees only their own tickets; ADMIN sees every ticket', async () => {
     // A second ticket, created by another non-admin, so there are two total.
     await request(app.getHttpServer())
-      .post('/tickets')
+      .post('/tickets/ansible')
       .set('Authorization', `Bearer ${otherUserToken}`)
-      .send(validTicketBody())
+      .send(validAnsibleTicketBody())
       .expect(201);
 
     const creatorResponse = await request(app.getHttpServer())
@@ -296,55 +285,5 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
       .expect(404);
 
     expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it('creates and approves a DATABASE ticket, forwarding the structured action to pcbox-api', async () => {
-    const createResponse = await request(app.getHttpServer())
-      .post('/tickets')
-      .set('Authorization', `Bearer ${creatorToken}`)
-      .send({
-        assignee: 'Ana Aprobadora',
-        department: 'Datacenter',
-        subject: 'Read a row',
-        description: 'Need to read one row',
-        ticketType: 'DATABASE',
-        namespace: 'pcbox-api',
-        deployment: 'pcbox-db',
-        dbName: 'pcbox-db',
-        sqlCode: 'SELECT 1;',
-      })
-      .expect(201);
-
-    const createdBody = createResponse.body as {
-      data: { id: number; ticketType: string; sqlCode: string };
-    };
-    expect(createdBody.data.ticketType).toBe('DATABASE');
-    expect(createdBody.data.sqlCode).toBe('SELECT 1;');
-
-    mockPcboxApiSuccess(fetchSpy);
-
-    await request(app.getHttpServer())
-      .patch(`/tickets/${createdBody.data.id}/approve`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .expect(200);
-
-    const [, requestInit] = fetchSpy.mock.calls.find(
-      ([url]) => url === 'http://pcbox-api.test/database',
-    )!;
-    const sentBody = JSON.parse(
-      (requestInit as RequestInit).body as string,
-    ) as Record<string, unknown>;
-    expect(sentBody).toEqual({
-      ticketNumber: 3,
-      department: 'Datacenter',
-      informer: CREATOR_EMAIL,
-      approver: 'Ana Aprobadora',
-      status: 'APPROVED',
-      namespace: 'pcbox-api',
-      deployment: 'pcbox-db',
-      dbName: 'pcbox-db',
-      sqlCode: 'SELECT 1;',
-    });
-    expect(sentBody.ticketType).toBeUndefined();
   });
 });

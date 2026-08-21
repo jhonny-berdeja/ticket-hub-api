@@ -1,30 +1,20 @@
 import { plainToInstance } from 'class-transformer';
 import { validate, ValidationError } from 'class-validator';
-import { CreateTicketDto } from './create-ticket.dto';
-import { TicketType } from '../../../common/database/ticket/ticket-type.enum';
+import { CreateDatabaseTicketDto } from './create-database-ticket.dto';
 
 function validateDto(
   payload: Record<string, unknown>,
 ): Promise<ValidationError[]> {
-  const instance = plainToInstance(CreateTicketDto, payload);
+  const instance = plainToInstance(CreateDatabaseTicketDto, payload);
   return validate(instance);
 }
 
-describe('CreateTicketDto — ticketType-conditional validation', () => {
-  const baseAnsible = {
-    assignee: 'Jane',
-    department: 'Datacenter',
-    subject: 'Restart pod',
-    description: 'Please restart',
-    ticketType: TicketType.ANSIBLE,
-  };
-
+describe('CreateDatabaseTicketDto', () => {
   const baseDatabase = {
     assignee: 'Jane',
     department: 'Datacenter',
     subject: 'Read row',
     description: 'Please read',
-    ticketType: TicketType.DATABASE,
     namespace: 'pcbox-api',
     deployment: 'pcbox-db',
     dbName: 'pcbox-db',
@@ -37,11 +27,6 @@ describe('CreateTicketDto — ticketType-conditional validation', () => {
     expect(errors.some((error) => error.property === 'sqlCode')).toBe(true);
   });
 
-  it('rejects an ANSIBLE ticket missing codeAnsible with a validation error', async () => {
-    const errors = await validateDto(baseAnsible);
-    expect(errors.some((error) => error.property === 'codeAnsible')).toBe(true);
-  });
-
   it('rejects sqlCode over the 5000-char cap with a validation error', async () => {
     const errors = await validateDto({
       ...baseDatabase,
@@ -52,14 +37,6 @@ describe('CreateTicketDto — ticketType-conditional validation', () => {
 
   it('accepts a valid DATABASE ticket with zero validation errors', async () => {
     const errors = await validateDto(baseDatabase);
-    expect(errors).toHaveLength(0);
-  });
-
-  it('accepts a valid ANSIBLE ticket with zero validation errors', async () => {
-    const errors = await validateDto({
-      ...baseAnsible,
-      codeAnsible: '- hosts: all',
-    });
     expect(errors).toHaveLength(0);
   });
 });

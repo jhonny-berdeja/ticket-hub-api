@@ -1,9 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { TicketEntity } from '../../common/database/ticket/ticket.entity';
 import { TicketsRepository } from '../../common/database/ticket/tickets.repository';
 import { Role } from '../../common/database/role/role.enum';
 import { ResponseBody } from '../../common/dto/response-body.dto';
 import { AuthenticatedUser } from '../auth/authenticated-user';
-import { CreateTicketDto } from './dto/create-ticket.dto';
+import { CreateAnsibleTicketDto } from './dto/create-ansible-ticket.dto';
+import { CreateDatabaseTicketDto } from './dto/create-database-ticket.dto';
 import { TicketMapper } from './ticket.mapper';
 import { TicketResponse } from './ticket-response';
 
@@ -14,27 +16,24 @@ const ADMIN_ROLE_NAME: string = Role.ADMIN;
 export class TicketsService {
   constructor(private readonly ticketsRepository: TicketsRepository) {}
 
-  async create(
-    dto: CreateTicketDto,
+  createAnsible(
+    dto: CreateAnsibleTicketDto,
     creator: number,
     informer: string,
   ): Promise<ResponseBody<TicketResponse>> {
-    const maxNumber = await this.ticketsRepository.findMaxNumber();
-    const nextNumber = (maxNumber ?? 0) + 1;
-
-    const ticketEntity = TicketMapper.toEntity(
-      dto,
-      creator,
-      informer,
-      nextNumber,
+    return this.persistNewTicket((number) =>
+      TicketMapper.toAnsibleEntity(dto, creator, informer, number),
     );
-    const createdTicket =
-      await this.ticketsRepository.createTicket(ticketEntity);
+  }
 
-    return ResponseBody.builder<TicketResponse>()
-      .withMsg('Ticket created successfully')
-      .withData(TicketMapper.toResponse(createdTicket))
-      .build();
+  createDatabase(
+    dto: CreateDatabaseTicketDto,
+    creator: number,
+    informer: string,
+  ): Promise<ResponseBody<TicketResponse>> {
+    return this.persistNewTicket((number) =>
+      TicketMapper.toDatabaseEntity(dto, creator, informer, number),
+    );
   }
 
   async findMineOrAll(
@@ -66,6 +65,28 @@ export class TicketsService {
     return ResponseBody.builder<TicketResponse>()
       .withMsg('Ticket found')
       .withData(TicketMapper.toResponse(ticket))
+      .build();
+  }
+
+  /**
+   * Shared by both create endpoints: only the entity-building step differs
+   * (`TicketMapper.toAnsibleEntity` vs. `toDatabaseEntity`) — numbering,
+   * persistence and response-building are identical, so they live here
+   * once instead of being duplicated across `createAnsible`/`createDatabase`.
+   */
+  private async persistNewTicket(
+    buildEntity: (number: number) => TicketEntity,
+  ): Promise<ResponseBody<TicketResponse>> {
+    const maxNumber = await this.ticketsRepository.findMaxNumber();
+    const nextNumber = (maxNumber ?? 0) + 1;
+
+    const ticketEntity = buildEntity(nextNumber);
+    const createdTicket =
+      await this.ticketsRepository.createTicket(ticketEntity);
+
+    return ResponseBody.builder<TicketResponse>()
+      .withMsg('Ticket created successfully')
+      .withData(TicketMapper.toResponse(createdTicket))
       .build();
   }
 }

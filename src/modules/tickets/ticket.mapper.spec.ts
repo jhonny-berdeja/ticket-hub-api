@@ -1,14 +1,14 @@
 import { TicketMapper } from './ticket.mapper';
-import { CreateTicketDto } from './dto/create-ticket.dto';
+import { CreateAnsibleTicketDto } from './dto/create-ansible-ticket.dto';
+import { CreateDatabaseTicketDto } from './dto/create-database-ticket.dto';
 import { TicketType } from '../../common/database/ticket/ticket-type.enum';
 
-function buildDatabaseDto(): CreateTicketDto {
-  const dto = new CreateTicketDto();
+function buildDatabaseDto(): CreateDatabaseTicketDto {
+  const dto = new CreateDatabaseTicketDto();
   dto.assignee = 'Ana';
   dto.department = 'Datacenter';
   dto.subject = 'Read row';
   dto.description = 'Please read';
-  dto.ticketType = TicketType.DATABASE;
   dto.namespace = 'pcbox-api';
   dto.deployment = 'pcbox-db';
   dto.dbName = 'pcbox-db';
@@ -16,9 +16,24 @@ function buildDatabaseDto(): CreateTicketDto {
   return dto;
 }
 
+function buildAnsibleDto(): CreateAnsibleTicketDto {
+  const dto = new CreateAnsibleTicketDto();
+  dto.assignee = 'Ana';
+  dto.department = 'Datacenter';
+  dto.subject = 'Restart';
+  dto.description = 'Please restart';
+  dto.codeAnsible = '- hosts: all';
+  return dto;
+}
+
 describe('TicketMapper — DATABASE field carrying', () => {
-  it('toEntity carries every DATABASE field and leaves codeAnsible null', () => {
-    const entity = TicketMapper.toEntity(buildDatabaseDto(), 7, 'ana@x.com', 1);
+  it('toDatabaseEntity carries every DATABASE field and leaves codeAnsible null', () => {
+    const entity = TicketMapper.toDatabaseEntity(
+      buildDatabaseDto(),
+      7,
+      'ana@x.com',
+      1,
+    );
 
     expect(entity.ticketType).toBe(TicketType.DATABASE);
     expect(entity.codeAnsible).toBeNull();
@@ -28,22 +43,13 @@ describe('TicketMapper — DATABASE field carrying', () => {
     expect(entity.sqlCode).toBe('SELECT 1;');
   });
 
-  it('toEntity defaults ticketType to ANSIBLE when the dto omits it', () => {
-    const dto = new CreateTicketDto();
-    dto.assignee = 'Ana';
-    dto.department = 'Datacenter';
-    dto.subject = 'Restart';
-    dto.description = 'Please restart';
-    dto.codeAnsible = '- hosts: all';
-
-    const entity = TicketMapper.toEntity(dto, 7, 'ana@x.com', 1);
-
-    expect(entity.ticketType).toBe(TicketType.ANSIBLE);
-    expect(entity.dbNamespace).toBeNull();
-  });
-
   it('toResponse surfaces the persisted DATABASE fields verbatim', () => {
-    const entity = TicketMapper.toEntity(buildDatabaseDto(), 7, 'ana@x.com', 3);
+    const entity = TicketMapper.toDatabaseEntity(
+      buildDatabaseDto(),
+      7,
+      'ana@x.com',
+      3,
+    );
     entity.id = 99;
 
     const response = TicketMapper.toResponse(entity);
@@ -53,5 +59,23 @@ describe('TicketMapper — DATABASE field carrying', () => {
     expect(response.deployment).toBe('pcbox-db');
     expect(response.dbName).toBe('pcbox-db');
     expect(response.sqlCode).toBe('SELECT 1;');
+  });
+});
+
+describe('TicketMapper — ANSIBLE field carrying', () => {
+  it('toAnsibleEntity sets ticketType to ANSIBLE and leaves DATABASE fields null', () => {
+    const entity = TicketMapper.toAnsibleEntity(
+      buildAnsibleDto(),
+      7,
+      'ana@x.com',
+      1,
+    );
+
+    expect(entity.ticketType).toBe(TicketType.ANSIBLE);
+    expect(entity.codeAnsible).toBe('- hosts: all');
+    expect(entity.dbNamespace).toBeNull();
+    expect(entity.dbDeployment).toBeNull();
+    expect(entity.dbName).toBeNull();
+    expect(entity.sqlCode).toBeNull();
   });
 });

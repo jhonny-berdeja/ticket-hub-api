@@ -14,7 +14,8 @@ import { Role } from '../../common/database/role/role.enum';
 import { CurrentUser } from '../auth/guards/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/authenticated-user';
 import { ResponseBody } from '../../common/dto/response-body.dto';
-import { CreateTicketDto } from './dto/create-ticket.dto';
+import { CreateAnsibleTicketDto } from './dto/create-ansible-ticket.dto';
+import { CreateDatabaseTicketDto } from './dto/create-database-ticket.dto';
 import { TicketsService } from './tickets.service';
 import { ApproveTicketService } from './approve-ticket.service';
 import { TicketResponse } from './ticket-response';
@@ -29,13 +30,22 @@ export class TicketsController {
     private readonly pcboxApiService: PcboxApiService,
   ) {}
 
-  @Post()
+  @Post('ansible')
   @HttpCode(HttpStatus.CREATED)
-  create(
-    @Body() dto: CreateTicketDto,
+  createAnsible(
+    @Body() dto: CreateAnsibleTicketDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse>> {
-    return this.ticketsService.create(dto, user.sub, user.email);
+    return this.ticketsService.createAnsible(dto, user.sub, user.email);
+  }
+
+  @Post('database')
+  @HttpCode(HttpStatus.CREATED)
+  createDatabase(
+    @Body() dto: CreateDatabaseTicketDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ResponseBody<TicketResponse>> {
+    return this.ticketsService.createDatabase(dto, user.sub, user.email);
   }
 
   @Get()
