@@ -1,7 +1,6 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 import { TicketStatus } from './ticket-status.enum';
 import { TicketType } from './ticket-type.enum';
-import { OperationType } from './operation-type.enum';
 
 @Entity({ name: 'tickets' })
 export class TicketEntity {
@@ -60,14 +59,6 @@ export class TicketEntity {
   @Column({ name: 'db_name', type: 'varchar', length: 63, nullable: true })
   dbName!: string | null;
 
-  @Column({
-    name: 'operation_type',
-    type: 'varchar',
-    length: 10,
-    nullable: true,
-  })
-  operationType!: OperationType | null;
-
   @Column({ name: 'sql_code', type: 'varchar', length: 5000, nullable: true })
   sqlCode!: string | null;
 
@@ -91,7 +82,6 @@ export class TicketEntityBuilder {
   private dbNamespace: string | null = null;
   private dbDeployment: string | null = null;
   private dbName: string | null = null;
-  private operationType: OperationType | null = null;
   private sqlCode: string | null = null;
 
   withNumber(number: number): this {
@@ -164,11 +154,6 @@ export class TicketEntityBuilder {
     return this;
   }
 
-  withOperationType(operationType: OperationType | null): this {
-    this.operationType = operationType;
-    return this;
-  }
-
   withSqlCode(sqlCode: string | null): this {
     this.sqlCode = sqlCode;
     return this;
@@ -215,7 +200,6 @@ export class TicketEntityBuilder {
     entity.dbNamespace = this.dbNamespace;
     entity.dbDeployment = this.dbDeployment;
     entity.dbName = this.dbName;
-    entity.operationType = this.operationType;
     entity.sqlCode = this.sqlCode;
     return entity;
   }

@@ -3,7 +3,6 @@ import { PcboxApiConnector } from './pcbox-api.connector';
 import { TicketEntity } from '../../common/database/ticket/ticket.entity';
 import { TicketStatus } from '../../common/database/ticket/ticket-status.enum';
 import { TicketType } from '../../common/database/ticket/ticket-type.enum';
-import { OperationType } from '../../common/database/ticket/operation-type.enum';
 
 function buildResponse(status: number, body: unknown): Response {
   return {
@@ -28,7 +27,6 @@ describe('PcboxApiService — ticketType-aware request body', () => {
       .withDbNamespace('pcbox-api')
       .withDbDeployment('pcbox-db')
       .withDbName('pcbox-db')
-      .withOperationType(OperationType.LECTURA)
       .withSqlCode('SELECT 1;')
       .build();
 
@@ -52,7 +50,6 @@ describe('PcboxApiService — ticketType-aware request body', () => {
           namespace: 'pcbox-api',
           deployment: 'pcbox-db',
           dbName: 'pcbox-db',
-          operationType: OperationType.LECTURA,
           sqlCode: 'SELECT 1;',
         },
       }),

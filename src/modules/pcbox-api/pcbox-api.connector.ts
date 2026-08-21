@@ -5,7 +5,6 @@ export interface PcboxApiDatabaseAction {
   namespace: string;
   deployment: string;
   dbName: string;
-  operationType: string;
   sqlCode: string;
 }
 

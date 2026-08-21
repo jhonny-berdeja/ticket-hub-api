@@ -7,10 +7,8 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { TicketType } from '../../../common/database/ticket/ticket-type.enum';
-import { OperationType } from '../../../common/database/ticket/operation-type.enum';
 
 const TICKET_TYPES = Object.values(TicketType);
-const OPERATION_TYPES = Object.values(OperationType);
 
 export class CreateTicketDto {
   @IsString()
@@ -58,10 +56,6 @@ export class CreateTicketDto {
   @IsNotEmpty()
   @MaxLength(63)
   dbName?: string;
-
-  @ValidateIf((dto: CreateTicketDto) => dto.ticketType === TicketType.DATABASE)
-  @IsIn(OPERATION_TYPES)
-  operationType?: OperationType;
 
   @ValidateIf((dto: CreateTicketDto) => dto.ticketType === TicketType.DATABASE)
   @IsString()

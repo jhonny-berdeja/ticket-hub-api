@@ -72,7 +72,6 @@ export class PcboxApiService {
           namespace: ticket.dbNamespace ?? '',
           deployment: ticket.dbDeployment ?? '',
           dbName: ticket.dbName ?? '',
-          operationType: ticket.operationType ?? '',
           sqlCode: ticket.sqlCode ?? '',
         },
       };

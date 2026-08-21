@@ -2,7 +2,6 @@ import { plainToInstance } from 'class-transformer';
 import { validate, ValidationError } from 'class-validator';
 import { CreateTicketDto } from './create-ticket.dto';
 import { TicketType } from '../../../common/database/ticket/ticket-type.enum';
-import { OperationType } from '../../../common/database/ticket/operation-type.enum';
 
 function validateDto(
   payload: Record<string, unknown>,
@@ -29,7 +28,6 @@ describe('CreateTicketDto — ticketType-conditional validation', () => {
     namespace: 'pcbox-api',
     deployment: 'pcbox-db',
     dbName: 'pcbox-db',
-    operationType: OperationType.LECTURA,
     sqlCode: 'SELECT 1;',
   };
 

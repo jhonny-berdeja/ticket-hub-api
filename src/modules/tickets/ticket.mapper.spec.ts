@@ -1,7 +1,6 @@
 import { TicketMapper } from './ticket.mapper';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { TicketType } from '../../common/database/ticket/ticket-type.enum';
-import { OperationType } from '../../common/database/ticket/operation-type.enum';
 
 function buildDatabaseDto(): CreateTicketDto {
   const dto = new CreateTicketDto();
@@ -13,7 +12,6 @@ function buildDatabaseDto(): CreateTicketDto {
   dto.namespace = 'pcbox-api';
   dto.deployment = 'pcbox-db';
   dto.dbName = 'pcbox-db';
-  dto.operationType = OperationType.LECTURA;
   dto.sqlCode = 'SELECT 1;';
   return dto;
 }
@@ -27,7 +25,6 @@ describe('TicketMapper — DATABASE field carrying', () => {
     expect(entity.dbNamespace).toBe('pcbox-api');
     expect(entity.dbDeployment).toBe('pcbox-db');
     expect(entity.dbName).toBe('pcbox-db');
-    expect(entity.operationType).toBe(OperationType.LECTURA);
     expect(entity.sqlCode).toBe('SELECT 1;');
   });
 
@@ -55,7 +52,6 @@ describe('TicketMapper — DATABASE field carrying', () => {
     expect(response.namespace).toBe('pcbox-api');
     expect(response.deployment).toBe('pcbox-db');
     expect(response.dbName).toBe('pcbox-db');
-    expect(response.operationType).toBe(OperationType.LECTURA);
     expect(response.sqlCode).toBe('SELECT 1;');
   });
 });

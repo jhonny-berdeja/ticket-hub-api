@@ -27,7 +27,6 @@ export class TicketMapper {
       .withDbNamespace(dto.namespace ?? null)
       .withDbDeployment(dto.deployment ?? null)
       .withDbName(dto.dbName ?? null)
-      .withOperationType(dto.operationType ?? null)
       .withSqlCode(dto.sqlCode ?? null)
       .build();
   }
@@ -49,7 +48,6 @@ export class TicketMapper {
       namespace: ticket.dbNamespace,
       deployment: ticket.dbDeployment,
       dbName: ticket.dbName,
-      operationType: ticket.operationType,
       sqlCode: ticket.sqlCode,
     };
   }
