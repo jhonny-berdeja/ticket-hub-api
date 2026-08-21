@@ -63,9 +63,9 @@ function mockPcboxApiSuccess(fetchSpy: jest.SpiedFunction<typeof fetch>) {
  * Creation itself is covered by `tickets-ansible.e2e-spec.ts` and
  * `tickets-database.e2e-spec.ts` — this suite only covers what stayed
  * unified across both ticket types: listing, lookup-by-number, approval
- * and the db-targets proxy. Fixture tickets here are created through
- * `POST /tickets/ansible` since the type doesn't matter to what's under
- * test.
+ * and the db-targets/assignable-users proxies. Fixture tickets here are
+ * created through `POST /tickets/ansible` since the type doesn't matter
+ * to what's under test.
  */
 describe('Tickets flow (e2e, in-memory DB)', () => {
   let app: INestApplication<App>;
@@ -274,6 +274,35 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     });
     expect(fetchSpy).toHaveBeenCalledWith(
       'http://pcbox-api.test/database/db-targets',
+      expect.objectContaining({ method: 'GET' }) as unknown,
+    );
+  });
+
+  it('GET /tickets/assignable-users proxies iam-api ADMINs of ticket-hub, wrapped in ResponseBody', async () => {
+    const internalUsers = [
+      { id: 1, name: 'Ana', lastname: 'Admin', email: 'ana@x.com' },
+      { id: 2, name: 'Beto', lastname: 'Admin', email: 'beto@x.com' },
+    ];
+    fetchSpy.mockImplementation((url: string) => {
+      if (url.endsWith('/apps-users/login')) {
+        return Promise.resolve(authApiLoginSuccessResponse());
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify(internalUsers), { status: 200 }),
+      );
+    });
+
+    const response = await request(app.getHttpServer())
+      .get('/tickets/assignable-users')
+      .set('Authorization', `Bearer ${creatorToken}`)
+      .expect(200);
+
+    expect(response.body).toEqual({
+      msg: 'Assignable users retrieved successfully',
+      data: internalUsers,
+    });
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://auth-api.test/internal-users?applicationName=ticket-hub&roleName=ADMIN',
       expect.objectContaining({ method: 'GET' }) as unknown,
     );
   });

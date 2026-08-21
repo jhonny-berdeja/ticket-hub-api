@@ -21,6 +21,8 @@ import { ApproveTicketService } from './approve-ticket.service';
 import { TicketResponse } from './ticket-response';
 import { PcboxApiService } from '../pcbox-api/pcbox-api.service';
 import { DbTarget } from '../pcbox-api/pcbox-api.connector';
+import { IamApiService } from '../iam-api/iam-api.service';
+import { InternalUser } from '../iam-api/iam-api.connector';
 
 @Controller('tickets')
 export class TicketsController {
@@ -28,6 +30,7 @@ export class TicketsController {
     private readonly ticketsService: TicketsService,
     private readonly approveTicketService: ApproveTicketService,
     private readonly pcboxApiService: PcboxApiService,
+    private readonly iamApiService: IamApiService,
   ) {}
 
   @Post('ansible')
@@ -70,6 +73,21 @@ export class TicketsController {
     return ResponseBody.builder<DbTarget[]>()
       .withMsg('Allowlisted database targets retrieved successfully')
       .withData(targets)
+      .build();
+  }
+
+  /**
+   * Ticket-hub's assignee dropdown: internal users with role ADMIN on the
+   * ticket-hub application in iam-api. Normal JWT auth only — ticket
+   * creation/assignment isn't role-restricted in this repo today, same as
+   * `POST /tickets/ansible`/`POST /tickets/database`.
+   */
+  @Get('assignable-users')
+  async getAssignableUsers(): Promise<ResponseBody<InternalUser[]>> {
+    const users = await this.iamApiService.fetchAssignableUsers();
+    return ResponseBody.builder<InternalUser[]>()
+      .withMsg('Assignable users retrieved successfully')
+      .withData(users)
       .build();
   }
 
