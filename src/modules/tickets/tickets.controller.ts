@@ -16,8 +16,12 @@ import type { AuthenticatedUser } from '../auth/authenticated-user';
 import { ResponseBody } from '../../common/dto/response-body.dto';
 import { CreateAnsibleTicketDto } from './dto/create-ansible-ticket.dto';
 import { CreateDatabaseTicketDto } from './dto/create-database-ticket.dto';
-import { TicketsService } from './tickets.service';
 import { ApproveTicketService } from './approve-ticket.service';
+import { CreateAnsibleTicketService } from './create-ansible-ticket.service';
+import { CreateDatabaseTicketService } from './create-database-ticket.service';
+import { FindTicketByNumberService } from './find-ticket-by-number.service';
+import { ListAnsibleTicketsService } from './list-ansible-tickets.service';
+import { ListDatabaseTicketsService } from './list-database-tickets.service';
 import { TicketResponse } from './ticket-response';
 import { PcboxApiService } from '../pcbox-api/pcbox-api.service';
 import { DbTarget } from '../pcbox-api/pcbox-api.connector';
@@ -27,8 +31,12 @@ import { InternalUser } from '../iam-api/iam-api.connector';
 @Controller('tickets')
 export class TicketsController {
   constructor(
-    private readonly ticketsService: TicketsService,
     private readonly approveTicketService: ApproveTicketService,
+    private readonly createAnsibleTicketService: CreateAnsibleTicketService,
+    private readonly createDatabaseTicketService: CreateDatabaseTicketService,
+    private readonly findTicketByNumberService: FindTicketByNumberService,
+    private readonly listAnsibleTicketsService: ListAnsibleTicketsService,
+    private readonly listDatabaseTicketsService: ListDatabaseTicketsService,
     private readonly pcboxApiService: PcboxApiService,
     private readonly iamApiService: IamApiService,
   ) {}
@@ -39,7 +47,7 @@ export class TicketsController {
     @Body() dto: CreateAnsibleTicketDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse>> {
-    return this.ticketsService.createAnsible(dto, user.email);
+    return this.createAnsibleTicketService.createAnsible(dto, user.email);
   }
 
   @Post('database')
@@ -48,28 +56,35 @@ export class TicketsController {
     @Body() dto: CreateDatabaseTicketDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse>> {
-    return this.ticketsService.createDatabase(dto, user.email);
+    return this.createDatabaseTicketService.createDatabase(dto, user.email);
   }
 
-  @Get()
-  findMineOrAll(
+  @Get('ansible')
+  findAnsibleMineOrAll(
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse[]>> {
-    return this.ticketsService.findMineOrAll(user);
+    return this.listAnsibleTicketsService.findMineOrAll(user);
+  }
+
+  @Get('database')
+  findDatabaseMineOrAll(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ResponseBody<TicketResponse[]>> {
+    return this.listDatabaseTicketsService.findMineOrAll(user);
   }
 
   /**
    * `:displayNumber` is the full prefixed display number (`DC-1`, `DB-1`),
    * not a bare integer — each of `datacenter_tickets`/`database_tickets`
    * has its own independent `number` sequence, so a bare integer would be
-   * ambiguous between the two tables (see `TicketsService.findByNumber`).
+   * ambiguous between the two tables (see `FindTicketByNumberService.findByNumber`).
    */
   @Get('by-number/:displayNumber')
   findByNumber(
     @Param('displayNumber') displayNumber: string,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse>> {
-    return this.ticketsService.findByNumber(displayNumber, user);
+    return this.findTicketByNumberService.findByNumber(displayNumber, user);
   }
 
   /** Proxies pcbox-api's allowlist so the create-ticket form's dropdown never hardcodes it — see design's "anti-drift" note. */

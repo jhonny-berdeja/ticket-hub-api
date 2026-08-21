@@ -121,7 +121,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     });
   });
 
-  it('non-ADMIN sees only their own tickets; ADMIN sees every ticket', async () => {
+  it('non-ADMIN sees only their own ANSIBLE tickets; ADMIN sees every ANSIBLE ticket', async () => {
     // A second ticket, created by another non-admin, so there are two total.
     await request(app.getHttpServer())
       .post('/tickets/ansible')
@@ -130,7 +130,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
       .expect(201);
 
     const creatorResponse = await request(app.getHttpServer())
-      .get('/tickets')
+      .get('/tickets/ansible')
       .set('Authorization', `Bearer ${creatorToken}`)
       .expect(200);
     const creatorTickets = (
@@ -140,7 +140,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     expect(creatorTickets[0].number).toBe('DC-1');
 
     const adminResponse = await request(app.getHttpServer())
-      .get('/tickets')
+      .get('/tickets/ansible')
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
     const adminTickets = (adminResponse.body as { data: { number: string }[] })
@@ -207,6 +207,43 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     expect((response.body as { data: { ticketType: string } }).data).toEqual(
       expect.objectContaining({ ticketType: 'ANSIBLE' }),
     );
+  });
+
+  it('non-ADMIN sees only their own DATABASE tickets; ADMIN sees every DATABASE ticket', async () => {
+    // DB-1 already exists (created by creatorToken in the previous test).
+    // A second one, created by another non-admin, so there are two total.
+    await request(app.getHttpServer())
+      .post('/tickets/database')
+      .set('Authorization', `Bearer ${otherUserToken}`)
+      .send({
+        assignee: 'Ana',
+        department: 'Datacenter',
+        subject: 'Read another row',
+        description: 'Please read',
+        namespace: 'pcbox-api',
+        deployment: 'pcbox-db',
+        dbName: 'pcbox-db',
+        sqlCode: 'SELECT 2;',
+      })
+      .expect(201);
+
+    const creatorResponse = await request(app.getHttpServer())
+      .get('/tickets/database')
+      .set('Authorization', `Bearer ${creatorToken}`)
+      .expect(200);
+    const creatorTickets = (
+      creatorResponse.body as { data: { number: string }[] }
+    ).data;
+    expect(creatorTickets).toHaveLength(1);
+    expect(creatorTickets[0].number).toBe('DB-1');
+
+    const adminResponse = await request(app.getHttpServer())
+      .get('/tickets/database')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const adminTickets = (adminResponse.body as { data: { number: string }[] })
+      .data;
+    expect(adminTickets).toHaveLength(2);
   });
 
   it('rejects approval from a non-ADMIN', async () => {

@@ -5,7 +5,8 @@ import { TicketStatus } from './ticket-status.enum';
  * ANSIBLE-flavored tickets, split out of the old shared `tickets` table
  * (see `ticket-hub-db.md` for the migration). `creator`/`ticketType` are
  * gone: this table alone is now the ANSIBLE discriminator, and ownership
- * checks use `informer` instead (see `TicketsService`).
+ * checks use `informer` instead (see `ListAnsibleTicketsService`/
+ * `FindTicketByNumberService`).
  */
 @Entity({ name: 'datacenter_tickets' })
 export class DatacenterTicketEntity {
