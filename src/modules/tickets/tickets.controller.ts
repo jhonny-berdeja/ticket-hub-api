@@ -58,12 +58,18 @@ export class TicketsController {
     return this.ticketsService.findMineOrAll(user);
   }
 
-  @Get('by-number/:number')
+  /**
+   * `:displayNumber` is the full prefixed display number (`DC-1`, `DB-1`),
+   * not a bare integer — each of `datacenter_tickets`/`database_tickets`
+   * has its own independent `number` sequence, so a bare integer would be
+   * ambiguous between the two tables (see `TicketsService.findByNumber`).
+   */
+  @Get('by-number/:displayNumber')
   findByNumber(
-    @Param('number', ParseIntPipe) number: number,
+    @Param('displayNumber') displayNumber: string,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse>> {
-    return this.ticketsService.findByNumber(number, user);
+    return this.ticketsService.findByNumber(displayNumber, user);
   }
 
   /** Proxies pcbox-api's allowlist so the create-ticket form's dropdown never hardcodes it — see design's "anti-drift" note. */

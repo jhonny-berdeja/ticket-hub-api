@@ -108,7 +108,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     fetchSpy.mockRestore();
   });
 
-  it('sets up ticket TK-1, created by creatorToken', async () => {
+  it('sets up ticket DC-1, created by creatorToken', async () => {
     const response = await request(app.getHttpServer())
       .post('/tickets/ansible')
       .set('Authorization', `Bearer ${creatorToken}`)
@@ -117,7 +117,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
 
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(response.body).toMatchObject({
-      data: { number: 'TK-1', informer: CREATOR_EMAIL },
+      data: { number: 'DC-1', informer: CREATOR_EMAIL },
     });
   });
 
@@ -137,7 +137,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
       creatorResponse.body as { data: { number: string }[] }
     ).data;
     expect(creatorTickets).toHaveLength(1);
-    expect(creatorTickets[0].number).toBe('TK-1');
+    expect(creatorTickets[0].number).toBe('DC-1');
 
     const adminResponse = await request(app.getHttpServer())
       .get('/tickets')
@@ -150,19 +150,62 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
 
   it('rejects a non-ADMIN looking up a ticket by number that is not theirs', async () => {
     await request(app.getHttpServer())
-      .get('/tickets/by-number/2')
+      .get('/tickets/by-number/DC-2')
       .set('Authorization', `Bearer ${creatorToken}`)
       .expect(404);
   });
 
   it('lets an ADMIN look up any ticket by number', async () => {
     const response = await request(app.getHttpServer())
-      .get('/tickets/by-number/1')
+      .get('/tickets/by-number/DC-1')
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
     expect((response.body as { data: { number: string } }).data.number).toBe(
-      'TK-1',
+      'DC-1',
+    );
+  });
+
+  it('404s looking up a ticket by an unrecognized prefix', async () => {
+    await request(app.getHttpServer())
+      .get('/tickets/by-number/TK-1')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(404);
+  });
+
+  it('404s looking up a ticket by a non-integer suffix', async () => {
+    await request(app.getHttpServer())
+      .get('/tickets/by-number/DC-abc')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(404);
+  });
+
+  it('404s looking up a database ticket number under the datacenter prefix — tables are never cross-queried', async () => {
+    await request(app.getHttpServer())
+      .post('/tickets/database')
+      .set('Authorization', `Bearer ${creatorToken}`)
+      .send({
+        assignee: 'Ana',
+        department: 'Datacenter',
+        subject: 'Read row',
+        description: 'Please read',
+        namespace: 'pcbox-api',
+        deployment: 'pcbox-db',
+        dbName: 'pcbox-db',
+        sqlCode: 'SELECT 1;',
+      })
+      .expect(201);
+
+    // The database ticket just created shares number 1 with the existing
+    // DC-1 datacenter ticket — DC-1 must keep resolving to the datacenter
+    // ticket, never falling through to the database one.
+    const response = await request(app.getHttpServer())
+      .get('/tickets/by-number/DC-1')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    expect((response.body as { data: { ticketType: string } }).data).toEqual(
+      expect.objectContaining({ ticketType: 'ANSIBLE' }),
     );
   });
 

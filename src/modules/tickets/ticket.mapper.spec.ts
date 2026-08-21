@@ -51,7 +51,7 @@ describe('TicketMapper — DATABASE field carrying', () => {
 
     const response = TicketMapper.toDatabaseResponse(entity);
 
-    expect(response.number).toBe('TK-3');
+    expect(response.number).toBe('DB-3');
     expect(response.ticketType).toBe(TicketType.DATABASE);
     expect(response.namespace).toBe('pcbox-api');
     expect(response.deployment).toBe('pcbox-db');
@@ -83,6 +83,7 @@ describe('TicketMapper — ANSIBLE field carrying', () => {
 
     const response = TicketMapper.toAnsibleResponse(entity);
 
+    expect(response.number).toBe('DC-1');
     expect(response.ticketType).toBe(TicketType.ANSIBLE);
     expect(response.codeAnsible).toBe('- hosts: all');
     expect(response.namespace).toBeNull();

@@ -2,11 +2,16 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatacenterTicketsRepository } from '../../common/database/ticket/datacenter-tickets.repository';
 import { DatabaseTicketsRepository } from '../../common/database/ticket/database-tickets.repository';
 import { Role } from '../../common/database/role/role.enum';
+import { TicketType } from '../../common/database/ticket/ticket-type.enum';
 import { ResponseBody } from '../../common/dto/response-body.dto';
 import { AuthenticatedUser } from '../auth/authenticated-user';
 import { CreateAnsibleTicketDto } from './dto/create-ansible-ticket.dto';
 import { CreateDatabaseTicketDto } from './dto/create-database-ticket.dto';
-import { TicketMapper } from './ticket.mapper';
+import {
+  DATABASE_NUMBER_DISPLAY_PREFIX,
+  DATACENTER_NUMBER_DISPLAY_PREFIX,
+  TicketMapper,
+} from './ticket.mapper';
 import { TicketResponse } from './ticket-response';
 
 const TICKET_NOT_FOUND_MESSAGE = 'Ticket not found';
@@ -78,40 +83,41 @@ export class TicketsService {
 
   /**
    * Each table has its own independent `number` sequence, so a bare
-   * `number` is ambiguous across tables — try `datacenter_tickets` first,
-   * then fall back to `database_tickets`.
+   * integer is ambiguous across tables — `displayNumber` carries the
+   * per-kind prefix (`DC-`/`DB-`) that says which table to query, and
+   * only that table is queried, never both. An unrecognized prefix, a
+   * non-integer suffix, and a well-formed-but-not-found number all
+   * collapse into the same "not found" response — never leaking which
+   * case it was.
    */
   async findByNumber(
-    number: number,
+    displayNumber: string,
     user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse>> {
-    const canViewAll = isAdmin(user);
-
-    const datacenterTicket =
-      await this.datacenterTicketsRepository.findByNumber(number);
-    if (datacenterTicket) {
-      if (!canViewAll && datacenterTicket.informer !== user.email) {
-        throw new NotFoundException(TICKET_NOT_FOUND_MESSAGE);
-      }
-      return ResponseBody.builder<TicketResponse>()
-        .withMsg('Ticket found')
-        .withData(TicketMapper.toAnsibleResponse(datacenterTicket))
-        .build();
+    const parsed = parseDisplayNumber(displayNumber);
+    if (!parsed) {
+      throw new NotFoundException(TICKET_NOT_FOUND_MESSAGE);
     }
 
-    const databaseTicket =
-      await this.databaseTicketsRepository.findByNumber(number);
-    if (databaseTicket) {
-      if (!canViewAll && databaseTicket.informer !== user.email) {
-        throw new NotFoundException(TICKET_NOT_FOUND_MESSAGE);
-      }
-      return ResponseBody.builder<TicketResponse>()
-        .withMsg('Ticket found')
-        .withData(TicketMapper.toDatabaseResponse(databaseTicket))
-        .build();
-    }
+    const result =
+      parsed.kind === TicketType.ANSIBLE
+        ? await this.findTicketByNumber(
+            this.datacenterTicketsRepository,
+            TicketMapper.toAnsibleResponse,
+            parsed.number,
+            user,
+          )
+        : await this.findTicketByNumber(
+            this.databaseTicketsRepository,
+            TicketMapper.toDatabaseResponse,
+            parsed.number,
+            user,
+          );
 
-    throw new NotFoundException(TICKET_NOT_FOUND_MESSAGE);
+    if (!result) {
+      throw new NotFoundException(TICKET_NOT_FOUND_MESSAGE);
+    }
+    return result;
   }
 
   /**
@@ -139,10 +145,74 @@ export class TicketsService {
       .withData(toResponse(createdTicket))
       .build();
   }
+
+  /**
+   * Shared by `findByNumber`'s two branches: only the repository/response-
+   * mapper pair differs per ticket kind — the lookup-then-authorize flow is
+   * identical, so it lives here once. Returns `null` (never throws) for
+   * "not found" or "found but not visible to this user", so both collapse
+   * into the same `NotFoundException` at the call site.
+   */
+  private async findTicketByNumber<TEntity extends { informer: string }>(
+    repository: { findByNumber(number: number): Promise<TEntity | null> },
+    toResponse: (entity: TEntity) => TicketResponse,
+    number: number,
+    user: AuthenticatedUser,
+  ): Promise<ResponseBody<TicketResponse> | null> {
+    const ticket = await repository.findByNumber(number);
+    if (!ticket) {
+      return null;
+    }
+
+    if (!isAdmin(user) && ticket.informer !== user.email) {
+      return null;
+    }
+
+    return ResponseBody.builder<TicketResponse>()
+      .withMsg('Ticket found')
+      .withData(toResponse(ticket))
+      .build();
+  }
 }
 
 function isAdmin(user: AuthenticatedUser): boolean {
   return user.apps.application.roles.some(
     (role) => role.name === ADMIN_ROLE_NAME,
   );
+}
+
+const DISPLAY_NUMBER_SUFFIX_PATTERN = /^\d+$/;
+
+type ParsedDisplayNumber = {
+  kind: TicketType.ANSIBLE | TicketType.DATABASE;
+  number: number;
+};
+
+/**
+ * Parses a display number (`DC-1`, `DB-42`) into which table to query and
+ * the bare integer to query it with. Returns `null` for anything that
+ * isn't well-formed — an unrecognized prefix or a non-integer suffix —
+ * so the caller can treat it exactly like a well-formed number that
+ * simply doesn't exist.
+ */
+function parseDisplayNumber(displayNumber: string): ParsedDisplayNumber | null {
+  let prefix: string;
+  let kind: TicketType.ANSIBLE | TicketType.DATABASE;
+
+  if (displayNumber.startsWith(DATACENTER_NUMBER_DISPLAY_PREFIX)) {
+    prefix = DATACENTER_NUMBER_DISPLAY_PREFIX;
+    kind = TicketType.ANSIBLE;
+  } else if (displayNumber.startsWith(DATABASE_NUMBER_DISPLAY_PREFIX)) {
+    prefix = DATABASE_NUMBER_DISPLAY_PREFIX;
+    kind = TicketType.DATABASE;
+  } else {
+    return null;
+  }
+
+  const suffix = displayNumber.slice(prefix.length);
+  if (!DISPLAY_NUMBER_SUFFIX_PATTERN.test(suffix)) {
+    return null;
+  }
+
+  return { kind, number: Number(suffix) };
 }

@@ -6,7 +6,14 @@ import { CreateAnsibleTicketDto } from './dto/create-ansible-ticket.dto';
 import { CreateDatabaseTicketDto } from './dto/create-database-ticket.dto';
 import { TicketResponse } from './ticket-response';
 
-const NUMBER_DISPLAY_PREFIX = 'TK-';
+/**
+ * Each table now has its own independent `number` sequence (see
+ * `ticket-hub-db.md`), so the display number needs a per-kind prefix —
+ * otherwise a datacenter ticket and a database ticket sharing the same
+ * bare `number` would be indistinguishable to a client.
+ */
+export const DATACENTER_NUMBER_DISPLAY_PREFIX = 'DC-';
+export const DATABASE_NUMBER_DISPLAY_PREFIX = 'DB-';
 
 export class TicketMapper {
   /** `POST /tickets/ansible` — the only write allowed to set ANSIBLE fields. */
@@ -56,7 +63,7 @@ export class TicketMapper {
   static toAnsibleResponse(ticket: DatacenterTicketEntity): TicketResponse {
     return {
       id: ticket.id,
-      number: `${NUMBER_DISPLAY_PREFIX}${ticket.number}`,
+      number: `${DATACENTER_NUMBER_DISPLAY_PREFIX}${ticket.number}`,
       informer: ticket.informer,
       assignee: ticket.assignee,
       department: ticket.department,
@@ -77,7 +84,7 @@ export class TicketMapper {
   static toDatabaseResponse(ticket: DatabaseTicketEntity): TicketResponse {
     return {
       id: ticket.id,
-      number: `${NUMBER_DISPLAY_PREFIX}${ticket.number}`,
+      number: `${DATABASE_NUMBER_DISPLAY_PREFIX}${ticket.number}`,
       informer: ticket.informer,
       assignee: ticket.assignee,
       department: ticket.department,

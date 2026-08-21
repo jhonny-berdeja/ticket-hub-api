@@ -32,7 +32,7 @@ describe('POST /tickets/ansible (e2e, in-memory DB)', () => {
     await app.close();
   });
 
-  it('happy path: any authenticated user creates an ANSIBLE ticket, numbered TK-1, status CREATED', async () => {
+  it('happy path: any authenticated user creates an ANSIBLE ticket, numbered DC-1, status CREATED', async () => {
     const response = await request(app.getHttpServer())
       .post('/tickets/ansible')
       .set('Authorization', `Bearer ${creatorToken}`)
@@ -49,7 +49,7 @@ describe('POST /tickets/ansible (e2e, in-memory DB)', () => {
       msg: 'Ticket created successfully',
       data: {
         id: expect.any(Number) as number,
-        number: 'TK-1',
+        number: 'DC-1',
         informer: CREATOR_EMAIL,
         assignee: 'Ana Aprobadora',
         department: 'Datacenter',
