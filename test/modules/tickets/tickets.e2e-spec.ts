@@ -150,14 +150,14 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
 
   it('rejects a non-ADMIN looking up a ticket by number that is not theirs', async () => {
     await request(app.getHttpServer())
-      .get('/tickets/by-number/DC-2')
+      .get('/tickets/ansible/by-number/2')
       .set('Authorization', `Bearer ${creatorToken}`)
       .expect(404);
   });
 
   it('lets an ADMIN look up any ticket by number', async () => {
     const response = await request(app.getHttpServer())
-      .get('/tickets/by-number/DC-1')
+      .get('/tickets/ansible/by-number/1')
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
@@ -166,21 +166,14 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     );
   });
 
-  it('404s looking up a ticket by an unrecognized prefix', async () => {
+  it('404s looking up an ansible ticket number that does not exist', async () => {
     await request(app.getHttpServer())
-      .get('/tickets/by-number/TK-1')
+      .get('/tickets/ansible/by-number/999')
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(404);
   });
 
-  it('404s looking up a ticket by a non-integer suffix', async () => {
-    await request(app.getHttpServer())
-      .get('/tickets/by-number/DC-abc')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .expect(404);
-  });
-
-  it('404s looking up a database ticket number under the datacenter prefix — tables are never cross-queried', async () => {
+  it('resolves each route to its own table when both tickets share the same bare number', async () => {
     await request(app.getHttpServer())
       .post('/tickets/database')
       .set('Authorization', `Bearer ${creatorToken}`)
@@ -196,17 +189,24 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
       })
       .expect(201);
 
-    // The database ticket just created shares number 1 with the existing
-    // DC-1 datacenter ticket — DC-1 must keep resolving to the datacenter
-    // ticket, never falling through to the database one.
-    const response = await request(app.getHttpServer())
-      .get('/tickets/by-number/DC-1')
+    // The database ticket just created shares bare number 1 with the
+    // existing datacenter ticket — each route must keep resolving to its
+    // own table, never falling through to the other one.
+    const ansibleResponse = await request(app.getHttpServer())
+      .get('/tickets/ansible/by-number/1')
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
+    expect(
+      (ansibleResponse.body as { data: { ticketType: string } }).data,
+    ).toEqual(expect.objectContaining({ ticketType: 'ANSIBLE' }));
 
-    expect((response.body as { data: { ticketType: string } }).data).toEqual(
-      expect.objectContaining({ ticketType: 'ANSIBLE' }),
-    );
+    const databaseResponse = await request(app.getHttpServer())
+      .get('/tickets/database/by-number/1')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(
+      (databaseResponse.body as { data: { ticketType: string } }).data,
+    ).toEqual(expect.objectContaining({ ticketType: 'DATABASE' }));
   });
 
   it('non-ADMIN sees only their own DATABASE tickets; ADMIN sees every DATABASE ticket', async () => {

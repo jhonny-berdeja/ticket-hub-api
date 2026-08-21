@@ -70,17 +70,27 @@ export class TicketsController {
   }
 
   /**
-   * `:displayNumber` is the full prefixed display number (`DC-1`, `DB-1`),
-   * not a bare integer — each of `datacenter_tickets`/`database_tickets`
-   * has its own independent `number` sequence, so a bare integer would be
-   * ambiguous between the two tables (see `FindTicketByNumberService.findByNumber`).
+   * `:number` is the bare integer, never a prefixed display number
+   * (`DC-1`) — the caller states which table to query via the route
+   * itself (`ansible`/`database`), so there's no prefix to parse here.
+   * Each of `datacenter_tickets`/`database_tickets` has its own
+   * independent `number` sequence, and only the table named by the route
+   * is ever queried (see `FindTicketByNumberService`).
    */
-  @Get('by-number/:displayNumber')
-  findByNumber(
-    @Param('displayNumber') displayNumber: string,
+  @Get('ansible/by-number/:number')
+  findAnsibleByNumber(
+    @Param('number', ParseIntPipe) number: number,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse>> {
-    return this.findTicketByNumberService.findByNumber(displayNumber, user);
+    return this.findTicketByNumberService.findAnsibleByNumber(number, user);
+  }
+
+  @Get('database/by-number/:number')
+  findDatabaseByNumber(
+    @Param('number', ParseIntPipe) number: number,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ResponseBody<TicketResponse>> {
+    return this.findTicketByNumberService.findDatabaseByNumber(number, user);
   }
 
   /** Proxies pcbox-api's allowlist so the create-ticket form's dropdown never hardcodes it — see design's "anti-drift" note. */
