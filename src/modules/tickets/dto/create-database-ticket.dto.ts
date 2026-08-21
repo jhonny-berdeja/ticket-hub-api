@@ -4,7 +4,10 @@ import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
  * `POST /tickets/database` — `ticketType` is fixed to `DATABASE`
  * server-side (see `TicketsController.createDatabase`), never accepted
  * from the client. `operationType` was removed ecosystem-wide and never
- * comes back here.
+ * comes back here. `namespace`/`deployment` are back (restored after a
+ * brief removal): pcbox-api's `DbTargetValidator`/`SqlPlaybookBuilder`
+ * genuinely need them as caller-supplied input at approval time, so
+ * `database_tickets` has to persist them (see `database-ticket.entity.ts`).
  */
 export class CreateDatabaseTicketDto {
   @IsString()

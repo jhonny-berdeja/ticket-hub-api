@@ -56,7 +56,7 @@ function mockPcboxApiSuccess(fetchSpy: jest.SpiedFunction<typeof fetch>) {
  * database. Only `fetch` is mocked, the one external boundary that
  * cannot run in this environment at all: `ApproveTicketService` calls
  * the real pcbox-api right after approval (see `PcboxApiService`).
- * DEV/APPROVER are gone (see `TicketEntity`'s doc comment): any
+ * DEV/APPROVER are gone (see `DatacenterTicketEntity`'s doc comment): any
  * authenticated user can create a ticket, only ADMIN approves, and
  * "own tickets vs. every ticket" now branches on ADMIN alone.
  *

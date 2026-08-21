@@ -1,8 +1,10 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { TicketEntity } from './ticket/ticket.entity';
-import { TicketsRepository } from './ticket/tickets.repository';
+import { DatacenterTicketEntity } from './ticket/datacenter-ticket.entity';
+import { DatabaseTicketEntity } from './ticket/database-ticket.entity';
+import { DatacenterTicketsRepository } from './ticket/datacenter-tickets.repository';
+import { DatabaseTicketsRepository } from './ticket/database-tickets.repository';
 
 @Global()
 @Module({
@@ -19,13 +21,17 @@ import { TicketsRepository } from './ticket/tickets.repository';
         username: configService.get<string>('POSTGRES_USER'),
         password: configService.get<string>('POSTGRES_PASSWORD'),
         database: configService.get<string>('DATABASE_NAME'),
-        entities: [TicketEntity],
+        entities: [DatacenterTicketEntity, DatabaseTicketEntity],
         synchronize: false,
       }),
     }),
-    TypeOrmModule.forFeature([TicketEntity]),
+    TypeOrmModule.forFeature([DatacenterTicketEntity, DatabaseTicketEntity]),
   ],
-  providers: [TicketsRepository],
-  exports: [TicketsRepository, TypeOrmModule],
+  providers: [DatacenterTicketsRepository, DatabaseTicketsRepository],
+  exports: [
+    DatacenterTicketsRepository,
+    DatabaseTicketsRepository,
+    TypeOrmModule,
+  ],
 })
 export class DatabaseModule {}

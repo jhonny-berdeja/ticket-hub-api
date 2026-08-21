@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { TicketEntity } from '../../common/database/ticket/ticket.entity';
-import { TicketType } from '../../common/database/ticket/ticket-type.enum';
+import { DatacenterTicketEntity } from '../../common/database/ticket/datacenter-ticket.entity';
+import { DatabaseTicketEntity } from '../../common/database/ticket/database-ticket.entity';
 import { DbTarget, PcboxApiConnector } from './pcbox-api.connector';
 
 const UNASSIGNED_MESSAGE = 'pcbox-api not notified: ticket has no assignee';
@@ -25,7 +25,9 @@ interface PcboxApiErrorBody {
 export class PcboxApiService {
   constructor(private readonly pcboxApiConnector: PcboxApiConnector) {}
 
-  async notifyApproval(ticket: TicketEntity): Promise<string> {
+  async notifyApproval(
+    ticket: DatacenterTicketEntity | DatabaseTicketEntity,
+  ): Promise<string> {
     if (ticket.assignee === null) {
       return UNASSIGNED_MESSAGE;
     }
@@ -45,12 +47,14 @@ export class PcboxApiService {
   }
 
   /**
-   * Routes to the right pcbox-api endpoint/body shape depending on
-   * `ticket.ticketType` — pcbox-api split `POST /pcbox` (Ansible-only) from
-   * `POST /database` (flat DATABASE body, no nested `database` object).
+   * Routes to the right pcbox-api endpoint/body shape depending on which
+   * table `ticket` came from — pcbox-api split `POST /pcbox`
+   * (Ansible-only) from `POST /database` (flat DATABASE body, no nested
+   * `database` object). There is no `ticketType` column anymore, so the
+   * entity's own class stands in for the old discriminator.
    */
   private sendToConnector(
-    ticket: TicketEntity,
+    ticket: DatacenterTicketEntity | DatabaseTicketEntity,
     assignee: string,
   ): Promise<Response> {
     const base = {
@@ -61,7 +65,7 @@ export class PcboxApiService {
       status: ticket.status,
     };
 
-    if (ticket.ticketType === TicketType.DATABASE) {
+    if (ticket instanceof DatabaseTicketEntity) {
       return this.pcboxApiConnector.createDatabaseAction({
         ...base,
         namespace: ticket.dbNamespace ?? '',

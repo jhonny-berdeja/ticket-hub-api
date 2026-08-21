@@ -1,10 +1,16 @@
 import { TicketStatus } from '../../common/database/ticket/ticket-status.enum';
 import { TicketType } from '../../common/database/ticket/ticket-type.enum';
 
+/**
+ * Unified response shape across both `datacenter_tickets` and
+ * `database_tickets` — `ticketType` is now purely derived by the mapper
+ * from which table a ticket came from (see `TicketMapper.toAnsibleResponse`
+ * / `toDatabaseResponse`), never a persisted column. `creator` is gone:
+ * ownership is tracked only via `informer`.
+ */
 export interface TicketResponse {
   id: number;
   number: string;
-  creator: number;
   informer: string;
   assignee: string | null;
   department: string;

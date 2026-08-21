@@ -1,4 +1,5 @@
-import { TicketEntity } from '../../common/database/ticket/ticket.entity';
+import { DatacenterTicketEntity } from '../../common/database/ticket/datacenter-ticket.entity';
+import { DatabaseTicketEntity } from '../../common/database/ticket/database-ticket.entity';
 import { TicketStatus } from '../../common/database/ticket/ticket-status.enum';
 import { TicketType } from '../../common/database/ticket/ticket-type.enum';
 import { CreateAnsibleTicketDto } from './dto/create-ansible-ticket.dto';
@@ -11,20 +12,17 @@ export class TicketMapper {
   /** `POST /tickets/ansible` — the only write allowed to set ANSIBLE fields. */
   static toAnsibleEntity(
     dto: CreateAnsibleTicketDto,
-    creator: number,
     informer: string,
     number: number,
-  ): TicketEntity {
-    return TicketEntity.builder()
+  ): DatacenterTicketEntity {
+    return DatacenterTicketEntity.builder()
       .withNumber(number)
-      .withCreator(creator)
       .withInformer(informer)
       .withAssignee(dto.assignee)
       .withDepartment(dto.department)
       .withSubject(dto.subject)
       .withStatus(TicketStatus.CREATED)
       .withDescription(dto.description)
-      .withTicketType(TicketType.ANSIBLE)
       .withCodeAnsible(dto.codeAnsible ?? null)
       .build();
   }
@@ -32,20 +30,17 @@ export class TicketMapper {
   /** `POST /tickets/database` — the only write allowed to set DATABASE fields. */
   static toDatabaseEntity(
     dto: CreateDatabaseTicketDto,
-    creator: number,
     informer: string,
     number: number,
-  ): TicketEntity {
-    return TicketEntity.builder()
+  ): DatabaseTicketEntity {
+    return DatabaseTicketEntity.builder()
       .withNumber(number)
-      .withCreator(creator)
       .withInformer(informer)
       .withAssignee(dto.assignee)
       .withDepartment(dto.department)
       .withSubject(dto.subject)
       .withStatus(TicketStatus.CREATED)
       .withDescription(dto.description)
-      .withTicketType(TicketType.DATABASE)
       .withDbNamespace(dto.namespace)
       .withDbDeployment(dto.deployment)
       .withDbName(dto.dbName)
@@ -53,19 +48,44 @@ export class TicketMapper {
       .build();
   }
 
-  static toResponse(ticket: TicketEntity): TicketResponse {
+  /**
+   * `ticketType` is derived here (`ANSIBLE`), not read off the entity —
+   * `datacenter_tickets` carries no discriminator column anymore, the
+   * table itself is the discriminator.
+   */
+  static toAnsibleResponse(ticket: DatacenterTicketEntity): TicketResponse {
     return {
       id: ticket.id,
       number: `${NUMBER_DISPLAY_PREFIX}${ticket.number}`,
-      creator: ticket.creator,
       informer: ticket.informer,
       assignee: ticket.assignee,
       department: ticket.department,
       subject: ticket.subject,
       status: ticket.status,
       description: ticket.description,
-      ticketType: ticket.ticketType,
+      ticketType: TicketType.ANSIBLE,
       codeAnsible: ticket.codeAnsible,
+      response: ticket.response,
+      namespace: null,
+      deployment: null,
+      dbName: null,
+      sqlCode: null,
+    };
+  }
+
+  /** Same as `toAnsibleResponse`, mirrored for `database_tickets`. */
+  static toDatabaseResponse(ticket: DatabaseTicketEntity): TicketResponse {
+    return {
+      id: ticket.id,
+      number: `${NUMBER_DISPLAY_PREFIX}${ticket.number}`,
+      informer: ticket.informer,
+      assignee: ticket.assignee,
+      department: ticket.department,
+      subject: ticket.subject,
+      status: ticket.status,
+      description: ticket.description,
+      ticketType: TicketType.DATABASE,
+      codeAnsible: null,
       response: ticket.response,
       namespace: ticket.dbNamespace,
       deployment: ticket.dbDeployment,

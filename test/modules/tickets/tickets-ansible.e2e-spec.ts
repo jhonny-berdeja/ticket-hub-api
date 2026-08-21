@@ -50,7 +50,6 @@ describe('POST /tickets/ansible (e2e, in-memory DB)', () => {
       data: {
         id: expect.any(Number) as number,
         number: 'TK-1',
-        creator: expect.any(Number) as number,
         informer: CREATOR_EMAIL,
         assignee: 'Ana Aprobadora',
         department: 'Datacenter',

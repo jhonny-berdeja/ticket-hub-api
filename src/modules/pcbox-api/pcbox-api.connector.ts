@@ -12,7 +12,13 @@ export interface PcboxApiCreateAdministrationBody {
   fileContent?: string;
 }
 
-/** `POST /database` — flat body, no nested `database` object. */
+/**
+ * `POST /database` — flat body, no nested `database` object.
+ * `namespace`/`deployment` are required here: pcbox-api's
+ * `DbTargetValidator.assertAllowed`/`SqlPlaybookBuilder.build` need them as
+ * caller-supplied input at approval time, so `database_tickets` persists
+ * them (see `database-ticket.entity.ts`) and forwards them here verbatim.
+ */
 export interface PcboxApiCreateDatabaseActionBody {
   ticketNumber: number;
   department: string;

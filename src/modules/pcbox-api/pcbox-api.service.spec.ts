@@ -1,8 +1,8 @@
 import { PcboxApiService } from './pcbox-api.service';
 import { PcboxApiConnector } from './pcbox-api.connector';
-import { TicketEntity } from '../../common/database/ticket/ticket.entity';
+import { DatacenterTicketEntity } from '../../common/database/ticket/datacenter-ticket.entity';
+import { DatabaseTicketEntity } from '../../common/database/ticket/database-ticket.entity';
 import { TicketStatus } from '../../common/database/ticket/ticket-status.enum';
-import { TicketType } from '../../common/database/ticket/ticket-type.enum';
 
 function buildResponse(status: number, body: unknown): Response {
   return {
@@ -12,18 +12,16 @@ function buildResponse(status: number, body: unknown): Response {
   } as unknown as Response;
 }
 
-describe('PcboxApiService — ticketType-aware routing', () => {
-  it('forwards a flat body to createDatabaseAction for a DATABASE ticket', async () => {
-    const ticket = TicketEntity.builder()
+describe('PcboxApiService — entity-class-aware routing', () => {
+  it('forwards a flat body to createDatabaseAction for a DatabaseTicketEntity', async () => {
+    const ticket = DatabaseTicketEntity.builder()
       .withNumber(5)
-      .withCreator(1)
       .withInformer('ana@x.com')
       .withAssignee('Beto')
       .withDepartment('Datacenter')
       .withSubject('Read row')
       .withStatus(TicketStatus.APPROVED)
       .withDescription('desc')
-      .withTicketType(TicketType.DATABASE)
       .withDbNamespace('pcbox-api')
       .withDbDeployment('pcbox-db')
       .withDbName('pcbox-db')
@@ -61,17 +59,15 @@ describe('PcboxApiService — ticketType-aware routing', () => {
     expect(createAdministration).not.toHaveBeenCalled();
   });
 
-  it('forwards a flat body (no ticketType) to createAdministration for an ANSIBLE ticket', async () => {
-    const ticket = TicketEntity.builder()
+  it('forwards a flat body to createAdministration for a DatacenterTicketEntity', async () => {
+    const ticket = DatacenterTicketEntity.builder()
       .withNumber(6)
-      .withCreator(1)
       .withInformer('ana@x.com')
       .withAssignee('Beto')
       .withDepartment('Datacenter')
       .withSubject('Restart')
       .withStatus(TicketStatus.APPROVED)
       .withDescription('desc')
-      .withTicketType(TicketType.ANSIBLE)
       .withCodeAnsible('- hosts: all')
       .build();
 

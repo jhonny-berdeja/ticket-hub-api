@@ -39,7 +39,7 @@ export class TicketsController {
     @Body() dto: CreateAnsibleTicketDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse>> {
-    return this.ticketsService.createAnsible(dto, user.sub, user.email);
+    return this.ticketsService.createAnsible(dto, user.email);
   }
 
   @Post('database')
@@ -48,7 +48,7 @@ export class TicketsController {
     @Body() dto: CreateDatabaseTicketDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse>> {
-    return this.ticketsService.createDatabase(dto, user.sub, user.email);
+    return this.ticketsService.createDatabase(dto, user.email);
   }
 
   @Get()

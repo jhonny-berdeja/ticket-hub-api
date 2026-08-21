@@ -1,20 +1,23 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 import { TicketStatus } from './ticket-status.enum';
-import { TicketType } from './ticket-type.enum';
 
-@Entity({ name: 'tickets' })
-export class TicketEntity {
+/**
+ * DATABASE-flavored tickets, split out of the old shared `tickets` table
+ * (see `ticket-hub-db.md` for the migration). `creator`/`ticketType` are
+ * gone. `db_namespace`/`db_deployment` stay, though: pcbox-api's
+ * `DbTargetValidator.assertAllowed`/`SqlPlaybookBuilder.build` genuinely
+ * need namespace/deployment/dbName as caller-supplied input at approval
+ * time, which can happen long after creation — this table is the only
+ * place that can carry them across that gap. Ownership checks use
+ * `informer` instead of the old `creator` (see `TicketsService`).
+ */
+@Entity({ name: 'database_tickets' })
+export class DatabaseTicketEntity {
   @PrimaryGeneratedColumn()
   id!: number;
 
   @Column({ type: 'int' })
   number!: number;
-
-  @Column({ name: 'ticket_type', type: 'varchar', length: 10 })
-  ticketType!: TicketType;
-
-  @Column({ type: 'int' })
-  creator!: number;
 
   @Column({ length: 30 })
   informer!: string;
@@ -33,14 +36,6 @@ export class TicketEntity {
 
   @Column({ length: 200 })
   description!: string;
-
-  @Column({
-    name: 'code_ansible',
-    type: 'varchar',
-    length: 500,
-    nullable: true,
-  })
-  codeAnsible!: string | null;
 
   @Column({ type: 'text', nullable: true })
   response!: string | null;
@@ -62,22 +57,19 @@ export class TicketEntity {
   @Column({ name: 'sql_code', type: 'varchar', length: 5000, nullable: true })
   sqlCode!: string | null;
 
-  static builder(): TicketEntityBuilder {
-    return new TicketEntityBuilder();
+  static builder(): DatabaseTicketEntityBuilder {
+    return new DatabaseTicketEntityBuilder();
   }
 }
 
-export class TicketEntityBuilder {
+export class DatabaseTicketEntityBuilder {
   private number?: number;
-  private creator?: number;
   private informer?: string;
   private assignee: string | null = null;
   private department?: string;
   private subject?: string;
   private status?: TicketStatus;
   private description?: string;
-  private ticketType?: TicketType;
-  private codeAnsible: string | null = null;
   private response: string | null = null;
   private dbNamespace: string | null = null;
   private dbDeployment: string | null = null;
@@ -86,11 +78,6 @@ export class TicketEntityBuilder {
 
   withNumber(number: number): this {
     this.number = number;
-    return this;
-  }
-
-  withCreator(creator: number): this {
-    this.creator = creator;
     return this;
   }
 
@@ -124,16 +111,6 @@ export class TicketEntityBuilder {
     return this;
   }
 
-  withTicketType(ticketType: TicketType): this {
-    this.ticketType = ticketType;
-    return this;
-  }
-
-  withCodeAnsible(codeAnsible: string | null): this {
-    this.codeAnsible = codeAnsible;
-    return this;
-  }
-
   withResponse(response: string | null): this {
     this.response = response;
     return this;
@@ -159,43 +136,36 @@ export class TicketEntityBuilder {
     return this;
   }
 
-  build(): TicketEntity {
+  build(): DatabaseTicketEntity {
     if (this.number === undefined) {
-      throw new Error('TicketEntity.Builder: number is required');
-    }
-    if (this.creator === undefined) {
-      throw new Error('TicketEntity.Builder: creator is required');
+      throw new Error('DatabaseTicketEntity.Builder: number is required');
     }
     if (this.informer === undefined) {
-      throw new Error('TicketEntity.Builder: informer is required');
+      throw new Error('DatabaseTicketEntity.Builder: informer is required');
     }
     if (this.department === undefined) {
-      throw new Error('TicketEntity.Builder: department is required');
+      throw new Error('DatabaseTicketEntity.Builder: department is required');
     }
     if (this.subject === undefined) {
-      throw new Error('TicketEntity.Builder: subject is required');
+      throw new Error('DatabaseTicketEntity.Builder: subject is required');
     }
     if (this.status === undefined) {
-      throw new Error('TicketEntity.Builder: status is required');
+      throw new Error('DatabaseTicketEntity.Builder: status is required');
     }
     if (this.description === undefined) {
-      throw new Error('TicketEntity.Builder: description is required');
-    }
-    if (this.ticketType === undefined) {
-      throw new Error('TicketEntity.Builder: ticketType is required');
+      throw new Error(
+        'DatabaseTicketEntity.Builder: description is required',
+      );
     }
 
-    const entity = new TicketEntity();
+    const entity = new DatabaseTicketEntity();
     entity.number = this.number;
-    entity.creator = this.creator;
     entity.informer = this.informer;
     entity.assignee = this.assignee;
     entity.department = this.department;
     entity.subject = this.subject;
     entity.status = this.status;
     entity.description = this.description;
-    entity.ticketType = this.ticketType;
-    entity.codeAnsible = this.codeAnsible;
     entity.response = this.response;
     entity.dbNamespace = this.dbNamespace;
     entity.dbDeployment = this.dbDeployment;
