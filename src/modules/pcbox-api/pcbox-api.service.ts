@@ -1,11 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TicketEntity } from '../../common/database/ticket/ticket.entity';
 import { TicketType } from '../../common/database/ticket/ticket-type.enum';
-import {
-  DbTarget,
-  PcboxApiConnector,
-  PcboxApiCreateAdministrationBody,
-} from './pcbox-api.connector';
+import { DbTarget, PcboxApiConnector } from './pcbox-api.connector';
 
 const UNASSIGNED_MESSAGE = 'pcbox-api not notified: ticket has no assignee';
 
@@ -30,13 +26,12 @@ export class PcboxApiService {
   constructor(private readonly pcboxApiConnector: PcboxApiConnector) {}
 
   async notifyApproval(ticket: TicketEntity): Promise<string> {
-    const body = this.buildRequestBody(ticket);
-    if (!body) {
+    if (ticket.assignee === null) {
       return UNASSIGNED_MESSAGE;
     }
 
     try {
-      const response = await this.pcboxApiConnector.createAdministration(body);
+      const response = await this.sendToConnector(ticket, ticket.assignee);
       return await this.describeResponse(response);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -49,38 +44,37 @@ export class PcboxApiService {
     return this.pcboxApiConnector.fetchDbTargets();
   }
 
-  private buildRequestBody(
+  /**
+   * Routes to the right pcbox-api endpoint/body shape depending on
+   * `ticket.ticketType` — pcbox-api split `POST /pcbox` (Ansible-only) from
+   * `POST /database` (flat DATABASE body, no nested `database` object).
+   */
+  private sendToConnector(
     ticket: TicketEntity,
-  ): PcboxApiCreateAdministrationBody | null {
-    if (ticket.assignee === null) {
-      return null;
-    }
-
+    assignee: string,
+  ): Promise<Response> {
     const base = {
       ticketNumber: ticket.number,
       department: ticket.department,
       informer: ticket.informer,
-      approver: ticket.assignee,
+      approver: assignee,
       status: ticket.status,
-      ticketType: ticket.ticketType,
     };
 
     if (ticket.ticketType === TicketType.DATABASE) {
-      return {
+      return this.pcboxApiConnector.createDatabaseAction({
         ...base,
-        database: {
-          namespace: ticket.dbNamespace ?? '',
-          deployment: ticket.dbDeployment ?? '',
-          dbName: ticket.dbName ?? '',
-          sqlCode: ticket.sqlCode ?? '',
-        },
-      };
+        namespace: ticket.dbNamespace ?? '',
+        deployment: ticket.dbDeployment ?? '',
+        dbName: ticket.dbName ?? '',
+        sqlCode: ticket.sqlCode ?? '',
+      });
     }
 
-    return {
+    return this.pcboxApiConnector.createAdministration({
       ...base,
       fileContent: ticket.codeAnsible ?? '',
-    };
+    });
   }
 
   private async describeResponse(response: Response): Promise<string> {

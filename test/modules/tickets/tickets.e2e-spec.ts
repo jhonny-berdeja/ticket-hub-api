@@ -233,7 +233,6 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
           informer: CREATOR_EMAIL,
           approver: 'Ana Aprobadora',
           status: 'APPROVED',
-          ticketType: 'ANSIBLE',
           fileContent: 'playbook: restart.yml',
         }),
       }) as unknown,
@@ -255,7 +254,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     expect(body.data.response).toBe('pcbox-api unreachable: ECONNREFUSED');
   });
 
-  it("GET /tickets/db-targets proxies pcbox-api's allowlist verbatim", async () => {
+  it("GET /tickets/db-targets proxies pcbox-api's allowlist verbatim, from /database/db-targets", async () => {
     const targets = [
       {
         namespace: 'ticket-hub',
@@ -284,6 +283,10 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
       msg: 'Allowlisted database targets retrieved successfully',
       data: targets,
     });
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://pcbox-api.test/database/db-targets',
+      expect.objectContaining({ method: 'GET' }) as unknown,
+    );
   });
 
   it('404s approving a ticket that does not exist', async () => {
@@ -326,20 +329,22 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
       .expect(200);
 
     const [, requestInit] = fetchSpy.mock.calls.find(
-      ([url]) => url === 'http://pcbox-api.test/pcbox',
+      ([url]) => url === 'http://pcbox-api.test/database',
     )!;
     const sentBody = JSON.parse(
       (requestInit as RequestInit).body as string,
-    ) as {
-      ticketType: string;
-      database: { namespace: string; sqlCode: string };
-    };
-    expect(sentBody.ticketType).toBe('DATABASE');
-    expect(sentBody.database).toEqual({
+    ) as Record<string, unknown>;
+    expect(sentBody).toEqual({
+      ticketNumber: 3,
+      department: 'Datacenter',
+      informer: CREATOR_EMAIL,
+      approver: 'Ana Aprobadora',
+      status: 'APPROVED',
       namespace: 'pcbox-api',
       deployment: 'pcbox-db',
       dbName: 'pcbox-db',
       sqlCode: 'SELECT 1;',
     });
+    expect(sentBody.ticketType).toBeUndefined();
   });
 });

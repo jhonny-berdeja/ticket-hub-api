@@ -41,6 +41,9 @@ export class EnvironmentVariables {
    * `http://auth-api.auth-api.svc.cluster.local:3000` -- `JwksClientService`
    * polls `${AUTH_API_URL}/.well-known/jwks.json` every 5 minutes to
    * refresh the RS256 key `JwtAuthGuard` verifies every token against.
+   * Also the base URL for iam-api's `GET /internal-users` (`IamApiConnector`)
+   * and for the shared `AuthApiLoginService` both it and `PcboxApiConnector`
+   * log into before calling their respective downstream APIs.
    */
   @IsString()
   @IsNotEmpty()
@@ -63,17 +66,20 @@ export class EnvironmentVariables {
   PCBOX_API_URL!: string;
 
   /**
-   * The application PcboxApiConnector logs into on auth-api
-   * (`X-Application-Name`) before calling pcbox-api -- must match
-   * whatever pcbox-api was registered as in auth-api's `applications`
-   * table (see the data migration in iam).
+   * The application `AuthApiLoginService` logs into on auth-api
+   * (`X-Application-Name`) before calling pcbox-api or iam-api -- must
+   * match whatever pcbox-api was registered as in auth-api's
+   * `applications` table (see the data migration in iam). Reused as-is
+   * for iam-api calls too: this app has a single registered
+   * application/credential pair in auth-api regardless of which
+   * downstream API it's about to call.
    */
   @IsString()
   @IsNotEmpty()
   PCBOX_API_APPLICATION_NAME!: string;
 
   /**
-   * apps-user credentials (`clienteId`/`clienteSecret`) PcboxApiConnector
+   * apps-user credentials (`clienteId`/`clienteSecret`) `AuthApiLoginService`
    * logs in with against auth-api's `POST /apps-users/login`, replacing
    * the old shared `PCBOX_API_ADMIN_KEY` -- see the connector's own
    * history. Both provisioned from the same Secret.

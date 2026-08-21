@@ -12,8 +12,8 @@ function buildResponse(status: number, body: unknown): Response {
   } as unknown as Response;
 }
 
-describe('PcboxApiService — ticketType-aware request body', () => {
-  it('forwards the structured `database` action for a DATABASE ticket, with ticketType set', async () => {
+describe('PcboxApiService — ticketType-aware routing', () => {
+  it('forwards a flat body to createDatabaseAction for a DATABASE ticket', async () => {
     const ticket = TicketEntity.builder()
       .withNumber(5)
       .withCreator(1)
@@ -30,7 +30,7 @@ describe('PcboxApiService — ticketType-aware request body', () => {
       .withSqlCode('SELECT 1;')
       .build();
 
-    const createAdministration = jest.fn().mockResolvedValue(
+    const createDatabaseAction = jest.fn().mockResolvedValue(
       buildResponse(201, {
         msg: 'ok',
         data: {
@@ -38,25 +38,30 @@ describe('PcboxApiService — ticketType-aware request body', () => {
         },
       }),
     );
-    const connector = { createAdministration } as unknown as PcboxApiConnector;
+    const createAdministration = jest.fn();
+    const connector = {
+      createDatabaseAction,
+      createAdministration,
+    } as unknown as PcboxApiConnector;
     const service = new PcboxApiService(connector);
 
     await service.notifyApproval(ticket);
 
-    expect(createAdministration).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ticketType: TicketType.DATABASE,
-        database: {
-          namespace: 'pcbox-api',
-          deployment: 'pcbox-db',
-          dbName: 'pcbox-db',
-          sqlCode: 'SELECT 1;',
-        },
-      }),
-    );
+    expect(createDatabaseAction).toHaveBeenCalledWith({
+      ticketNumber: 5,
+      department: 'Datacenter',
+      informer: 'ana@x.com',
+      approver: 'Beto',
+      status: TicketStatus.APPROVED,
+      namespace: 'pcbox-api',
+      deployment: 'pcbox-db',
+      dbName: 'pcbox-db',
+      sqlCode: 'SELECT 1;',
+    });
+    expect(createAdministration).not.toHaveBeenCalled();
   });
 
-  it('still forwards `fileContent` for an ANSIBLE ticket, with ticketType set', async () => {
+  it('forwards a flat body (no ticketType) to createAdministration for an ANSIBLE ticket', async () => {
     const ticket = TicketEntity.builder()
       .withNumber(6)
       .withCreator(1)
@@ -78,16 +83,23 @@ describe('PcboxApiService — ticketType-aware request body', () => {
         },
       }),
     );
-    const connector = { createAdministration } as unknown as PcboxApiConnector;
+    const createDatabaseAction = jest.fn();
+    const connector = {
+      createAdministration,
+      createDatabaseAction,
+    } as unknown as PcboxApiConnector;
     const service = new PcboxApiService(connector);
 
     await service.notifyApproval(ticket);
 
-    expect(createAdministration).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ticketType: TicketType.ANSIBLE,
-        fileContent: '- hosts: all',
-      }),
-    );
+    expect(createAdministration).toHaveBeenCalledWith({
+      ticketNumber: 6,
+      department: 'Datacenter',
+      informer: 'ana@x.com',
+      approver: 'Beto',
+      status: TicketStatus.APPROVED,
+      fileContent: '- hosts: all',
+    });
+    expect(createDatabaseAction).not.toHaveBeenCalled();
   });
 });
