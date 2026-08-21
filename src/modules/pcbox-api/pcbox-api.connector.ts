@@ -43,7 +43,8 @@ interface DbTargetsResponse {
 
 @Injectable()
 export class PcboxApiConnector {
-  private static readonly REQUEST_TIMEOUT_MS = 130_000;
+  /** 10s above pcbox-api's own 4-minute playbook execution timeout. */
+  private static readonly REQUEST_TIMEOUT_MS = 250_000;
   private static readonly LOGIN_TIMEOUT_MS = 10_000;
 
   constructor(
