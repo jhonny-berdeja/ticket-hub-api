@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DatacenterTicketEntity } from '../../common/database/ticket/datacenter-ticket.entity';
 import { DatabaseTicketEntity } from '../../common/database/ticket/database-ticket.entity';
+import { KubernetesTicketEntity } from '../../common/database/ticket/kubernetes-ticket.entity';
 import { DbTarget, PcboxApiConnector } from './pcbox-api.connector';
 
 const UNASSIGNED_MESSAGE = 'pcbox-api not notified: ticket has no assignee';
@@ -26,7 +27,7 @@ export class PcboxApiService {
   constructor(private readonly pcboxApiConnector: PcboxApiConnector) {}
 
   async notifyApproval(
-    ticket: DatacenterTicketEntity | DatabaseTicketEntity,
+    ticket: DatacenterTicketEntity | DatabaseTicketEntity | KubernetesTicketEntity,
   ): Promise<string> {
     if (ticket.assignee === null) {
       return UNASSIGNED_MESSAGE;
@@ -50,11 +51,12 @@ export class PcboxApiService {
    * Routes to the right pcbox-api endpoint/body shape depending on which
    * table `ticket` came from — pcbox-api split `POST /pcbox`
    * (Ansible-only) from `POST /database` (flat DATABASE body, no nested
-   * `database` object). There is no `ticketType` column anymore, so the
+   * `database` object) and `POST /kubernetes` (flat KUBERNETES body, same
+   * shape as `/pcbox`). There is no `ticketType` column anymore, so the
    * entity's own class stands in for the old discriminator.
    */
   private sendToConnector(
-    ticket: DatacenterTicketEntity | DatabaseTicketEntity,
+    ticket: DatacenterTicketEntity | DatabaseTicketEntity | KubernetesTicketEntity,
     assignee: string,
   ): Promise<Response> {
     const base = {
@@ -72,6 +74,13 @@ export class PcboxApiService {
         deployment: ticket.dbDeployment ?? '',
         dbName: ticket.dbName ?? '',
         sqlCode: ticket.sqlCode ?? '',
+      });
+    }
+
+    if (ticket instanceof KubernetesTicketEntity) {
+      return this.pcboxApiConnector.createKubernetesAction({
+        ...base,
+        fileContent: ticket.codeYaml ?? '',
       });
     }
 

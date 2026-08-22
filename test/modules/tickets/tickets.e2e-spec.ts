@@ -441,4 +441,168 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
 
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+
+  it('sets up ticket KB-1, created by creatorToken', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/tickets/kubernetes')
+      .set('Authorization', `Bearer ${creatorToken}`)
+      .send({
+        assignee: 'Ana Aprobadora',
+        department: 'Datacenter',
+        subject: 'Deploy pod',
+        description: 'Necesito desplegar un pod',
+        codeYaml: 'apiVersion: apps/v1',
+      })
+      .expect(201);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(response.body).toMatchObject({
+      data: { number: 'KB-1', informer: CREATOR_EMAIL },
+    });
+  });
+
+  it('non-ADMIN sees only their own KUBERNETES tickets; ADMIN sees every KUBERNETES ticket', async () => {
+    // A second ticket, created by another non-admin, so there are two total.
+    await request(app.getHttpServer())
+      .post('/tickets/kubernetes')
+      .set('Authorization', `Bearer ${otherUserToken}`)
+      .send({
+        assignee: 'Ana',
+        department: 'Datacenter',
+        subject: 'Deploy another pod',
+        description: 'Please deploy',
+        codeYaml: 'apiVersion: apps/v1',
+      })
+      .expect(201);
+
+    const creatorResponse = await request(app.getHttpServer())
+      .get('/tickets/kubernetes')
+      .set('Authorization', `Bearer ${creatorToken}`)
+      .expect(200);
+    const creatorTickets = (
+      creatorResponse.body as { data: { number: string }[] }
+    ).data;
+    expect(creatorTickets).toHaveLength(1);
+    expect(creatorTickets[0].number).toBe('KB-1');
+
+    const adminResponse = await request(app.getHttpServer())
+      .get('/tickets/kubernetes')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const adminTickets = (adminResponse.body as { data: { number: string }[] })
+      .data;
+    expect(adminTickets).toHaveLength(2);
+  });
+
+  it('resolves the kubernetes route to its own table when all three ticket types share the same bare number', async () => {
+    const kubernetesResponse = await request(app.getHttpServer())
+      .get('/tickets/kubernetes/by-number/1')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(
+      (kubernetesResponse.body as { data: { ticketType: string } }).data,
+    ).toEqual(expect.objectContaining({ ticketType: 'KUBERNETES' }));
+  });
+
+  it('rejects a non-ADMIN looking up a kubernetes ticket by number that is not theirs', async () => {
+    await request(app.getHttpServer())
+      .get('/tickets/kubernetes/by-number/2')
+      .set('Authorization', `Bearer ${creatorToken}`)
+      .expect(404);
+  });
+
+  it('404s looking up a kubernetes ticket number that does not exist', async () => {
+    await request(app.getHttpServer())
+      .get('/tickets/kubernetes/by-number/999')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(404);
+  });
+
+  it('rejects kubernetes approval from a non-ADMIN', async () => {
+    await request(app.getHttpServer())
+      .patch('/tickets/kubernetes/1/approve')
+      .set('Authorization', `Bearer ${creatorToken}`)
+      .expect(403);
+  });
+
+  it('happy path: ADMIN approves a KUBERNETES ticket, and pcbox-api gets notified at /kubernetes', async () => {
+    mockPcboxApiSuccess(fetchSpy);
+
+    const response = await request(app.getHttpServer())
+      .patch('/tickets/kubernetes/1/approve')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    const body = response.body as {
+      data: { status: string; response: string | null };
+    };
+    expect(body.data.status).toBe('APPROVED');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://pcbox-api.test/kubernetes',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${PCBOX_API_TOKEN}`,
+        }) as unknown,
+        body: JSON.stringify({
+          ticketNumber: 1,
+          department: 'Datacenter',
+          informer: CREATOR_EMAIL,
+          approver: 'Ana Aprobadora',
+          status: 'APPROVED',
+          fileContent: 'apiVersion: apps/v1',
+        }),
+      }) as unknown,
+    );
+  });
+
+  it('approves the kubernetes route to its own table when ids are shared with other ticket types', async () => {
+    // Kubernetes ticket #2 (KB-2, created earlier in this suite) shares the
+    // same bare `id` with database ticket #2 (DB-2, already approved above)
+    // — approving it must never fall through to (or be satisfied by) that
+    // already-approved database row.
+    mockPcboxApiSuccess(fetchSpy);
+
+    const response = await request(app.getHttpServer())
+      .patch('/tickets/kubernetes/2/approve')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    const body = response.body as {
+      data: { id: number; ticketType: string; status: string };
+    };
+    expect(body.data).toEqual(
+      expect.objectContaining({
+        id: 2,
+        ticketType: 'KUBERNETES',
+        status: 'APPROVED',
+      }),
+    );
+
+    // The database ticket sharing id 2 stays exactly as approved before,
+    // untouched by this second approval.
+    const databaseResponse = await request(app.getHttpServer())
+      .get('/tickets/database/by-number/2')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(
+      (
+        databaseResponse.body as {
+          data: { ticketType: string; status: string };
+        }
+      ).data,
+    ).toEqual(
+      expect.objectContaining({ ticketType: 'DATABASE', status: 'APPROVED' }),
+    );
+  });
+
+  it('404s approving a kubernetes ticket that does not exist', async () => {
+    await request(app.getHttpServer())
+      .patch('/tickets/kubernetes/999/approve')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(404);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });

@@ -31,6 +31,20 @@ export interface PcboxApiCreateDatabaseActionBody {
   sqlCode: string;
 }
 
+/**
+ * `POST /kubernetes` — flat body, same shape as `createAdministration`
+ * (KUBERNETES tickets carry no extra target fields, unlike DATABASE's
+ * namespace/deployment/dbName).
+ */
+export interface PcboxApiCreateKubernetesActionBody {
+  ticketNumber: number;
+  department: string;
+  approver: string;
+  informer: string;
+  status: string;
+  fileContent: string;
+}
+
 export interface DbTarget {
   namespace: string;
   deployment: string;
@@ -63,6 +77,13 @@ export class PcboxApiConnector {
     body: PcboxApiCreateDatabaseActionBody,
   ): Promise<Response> {
     return this.postJson('/database', body);
+  }
+
+  /** `POST /kubernetes` — the KUBERNETES-ticket counterpart of `createAdministration`. */
+  createKubernetesAction(
+    body: PcboxApiCreateKubernetesActionBody,
+  ): Promise<Response> {
+    return this.postJson('/kubernetes', body);
   }
 
   /** Proxies pcbox-api's `GET /database/db-targets` — the single source of truth for the DATABASE-ticket allowlist (see design's "anti-drift" note). */

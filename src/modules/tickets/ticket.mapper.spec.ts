@@ -1,7 +1,18 @@
 import { TicketMapper } from './ticket.mapper';
 import { CreateAnsibleTicketDto } from './dto/create-ansible-ticket.dto';
 import { CreateDatabaseTicketDto } from './dto/create-database-ticket.dto';
+import { CreateKubernetesTicketDto } from './dto/create-kubernetes-ticket.dto';
 import { TicketType } from '../../common/database/ticket/ticket-type.enum';
+
+function buildKubernetesDto(): CreateKubernetesTicketDto {
+  const dto = new CreateKubernetesTicketDto();
+  dto.assignee = 'Ana';
+  dto.department = 'Datacenter';
+  dto.subject = 'Deploy';
+  dto.description = 'Please deploy';
+  dto.codeYaml = 'apiVersion: apps/v1';
+  return dto;
+}
 
 function buildDatabaseDto(): CreateDatabaseTicketDto {
   const dto = new CreateDatabaseTicketDto();
@@ -58,6 +69,7 @@ describe('TicketMapper — DATABASE field carrying', () => {
     expect(response.dbName).toBe('pcbox-db');
     expect(response.sqlCode).toBe('SELECT 1;');
     expect(response.codeAnsible).toBeNull();
+    expect(response.codeYaml).toBeNull();
   });
 });
 
@@ -86,6 +98,40 @@ describe('TicketMapper — ANSIBLE field carrying', () => {
     expect(response.number).toBe('DC-1');
     expect(response.ticketType).toBe(TicketType.ANSIBLE);
     expect(response.codeAnsible).toBe('- hosts: all');
+    expect(response.codeYaml).toBeNull();
+    expect(response.namespace).toBeNull();
+    expect(response.deployment).toBeNull();
+    expect(response.dbName).toBeNull();
+    expect(response.sqlCode).toBeNull();
+  });
+});
+
+describe('TicketMapper — KUBERNETES field carrying', () => {
+  it('toKubernetesEntity carries the KUBERNETES fields', () => {
+    const entity = TicketMapper.toKubernetesEntity(
+      buildKubernetesDto(),
+      'ana@x.com',
+      1,
+    );
+
+    expect(entity.informer).toBe('ana@x.com');
+    expect(entity.codeYaml).toBe('apiVersion: apps/v1');
+  });
+
+  it('toKubernetesResponse derives ticketType KUBERNETES and leaves other-kind fields null', () => {
+    const entity = TicketMapper.toKubernetesEntity(
+      buildKubernetesDto(),
+      'ana@x.com',
+      1,
+    );
+    entity.id = 42;
+
+    const response = TicketMapper.toKubernetesResponse(entity);
+
+    expect(response.number).toBe('KB-1');
+    expect(response.ticketType).toBe(TicketType.KUBERNETES);
+    expect(response.codeYaml).toBe('apiVersion: apps/v1');
+    expect(response.codeAnsible).toBeNull();
     expect(response.namespace).toBeNull();
     expect(response.deployment).toBeNull();
     expect(response.dbName).toBeNull();

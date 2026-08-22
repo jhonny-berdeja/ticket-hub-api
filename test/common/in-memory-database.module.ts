@@ -2,8 +2,10 @@ import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatacenterTicketEntity } from '../../src/common/database/ticket/datacenter-ticket.entity';
 import { DatabaseTicketEntity } from '../../src/common/database/ticket/database-ticket.entity';
+import { KubernetesTicketEntity } from '../../src/common/database/ticket/kubernetes-ticket.entity';
 import { DatacenterTicketsRepository } from '../../src/common/database/ticket/datacenter-tickets.repository';
 import { DatabaseTicketsRepository } from '../../src/common/database/ticket/database-tickets.repository';
+import { KubernetesTicketsRepository } from '../../src/common/database/ticket/kubernetes-tickets.repository';
 
 /**
  * Real, unmocked `TypeOrmModule` backed by a throwaway in-memory SQLite DB —
@@ -17,15 +19,28 @@ import { DatabaseTicketsRepository } from '../../src/common/database/ticket/data
     TypeOrmModule.forRoot({
       type: 'better-sqlite3',
       database: ':memory:',
-      entities: [DatacenterTicketEntity, DatabaseTicketEntity],
+      entities: [
+        DatacenterTicketEntity,
+        DatabaseTicketEntity,
+        KubernetesTicketEntity,
+      ],
       synchronize: true,
     }),
-    TypeOrmModule.forFeature([DatacenterTicketEntity, DatabaseTicketEntity]),
+    TypeOrmModule.forFeature([
+      DatacenterTicketEntity,
+      DatabaseTicketEntity,
+      KubernetesTicketEntity,
+    ]),
   ],
-  providers: [DatacenterTicketsRepository, DatabaseTicketsRepository],
+  providers: [
+    DatacenterTicketsRepository,
+    DatabaseTicketsRepository,
+    KubernetesTicketsRepository,
+  ],
   exports: [
     DatacenterTicketsRepository,
     DatabaseTicketsRepository,
+    KubernetesTicketsRepository,
     TypeOrmModule,
   ],
 })

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatacenterTicketsRepository } from '../../common/database/ticket/datacenter-tickets.repository';
 import { DatabaseTicketsRepository } from '../../common/database/ticket/database-tickets.repository';
+import { KubernetesTicketsRepository } from '../../common/database/ticket/kubernetes-tickets.repository';
 import { TicketStatus } from '../../common/database/ticket/ticket-status.enum';
 import { ResponseBody } from '../../common/dto/response-body.dto';
 import { PcboxApiService } from '../pcbox-api/pcbox-api.service';
@@ -21,6 +22,7 @@ export class ApproveTicketService {
   constructor(
     private readonly datacenterTicketsRepository: DatacenterTicketsRepository,
     private readonly databaseTicketsRepository: DatabaseTicketsRepository,
+    private readonly kubernetesTicketsRepository: KubernetesTicketsRepository,
     private readonly pcboxApiService: PcboxApiService,
   ) {}
 
@@ -69,6 +71,31 @@ export class ApproveTicketService {
     return ResponseBody.builder<TicketResponse>()
       .withMsg('Ticket approved successfully')
       .withData(TicketMapper.toDatabaseResponse(finalTicket))
+      .build();
+  }
+
+  async approveKubernetes(id: number): Promise<ResponseBody<TicketResponse>> {
+    const ticket = await this.kubernetesTicketsRepository.findById(id);
+    if (!ticket) {
+      throw new NotFoundException(TICKET_NOT_FOUND_MESSAGE);
+    }
+
+    const approvedTicket =
+      await this.kubernetesTicketsRepository.updateStatus(
+        id,
+        TicketStatus.APPROVED,
+      );
+    const response = await this.pcboxApiService.notifyApproval(
+      approvedTicket,
+    );
+    const finalTicket = await this.kubernetesTicketsRepository.updateResponse(
+      id,
+      response,
+    );
+
+    return ResponseBody.builder<TicketResponse>()
+      .withMsg('Ticket approved successfully')
+      .withData(TicketMapper.toKubernetesResponse(finalTicket))
       .build();
   }
 }

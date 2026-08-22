@@ -19,6 +19,7 @@ export interface TicketResponse {
   description: string;
   ticketType: TicketType;
   codeAnsible: string | null;
+  codeYaml: string | null;
   response: string | null;
   namespace: string | null;
   deployment: string | null;

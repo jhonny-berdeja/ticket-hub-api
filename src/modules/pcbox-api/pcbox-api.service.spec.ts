@@ -2,6 +2,7 @@ import { PcboxApiService } from './pcbox-api.service';
 import { PcboxApiConnector } from './pcbox-api.connector';
 import { DatacenterTicketEntity } from '../../common/database/ticket/datacenter-ticket.entity';
 import { DatabaseTicketEntity } from '../../common/database/ticket/database-ticket.entity';
+import { KubernetesTicketEntity } from '../../common/database/ticket/kubernetes-ticket.entity';
 import { TicketStatus } from '../../common/database/ticket/ticket-status.enum';
 
 function buildResponse(status: number, body: unknown): Response {
@@ -96,6 +97,49 @@ describe('PcboxApiService — entity-class-aware routing', () => {
       status: TicketStatus.APPROVED,
       fileContent: '- hosts: all',
     });
+    expect(createDatabaseAction).not.toHaveBeenCalled();
+  });
+
+  it('forwards a flat body to createKubernetesAction for a KubernetesTicketEntity', async () => {
+    const ticket = KubernetesTicketEntity.builder()
+      .withNumber(7)
+      .withInformer('ana@x.com')
+      .withAssignee('Beto')
+      .withDepartment('Datacenter')
+      .withSubject('Deploy')
+      .withStatus(TicketStatus.APPROVED)
+      .withDescription('desc')
+      .withCodeYaml('apiVersion: apps/v1')
+      .build();
+
+    const createKubernetesAction = jest.fn().mockResolvedValue(
+      buildResponse(201, {
+        msg: 'ok',
+        data: {
+          execution: { success: true, exitCode: 0, stdout: '', stderr: '' },
+        },
+      }),
+    );
+    const createAdministration = jest.fn();
+    const createDatabaseAction = jest.fn();
+    const connector = {
+      createKubernetesAction,
+      createAdministration,
+      createDatabaseAction,
+    } as unknown as PcboxApiConnector;
+    const service = new PcboxApiService(connector);
+
+    await service.notifyApproval(ticket);
+
+    expect(createKubernetesAction).toHaveBeenCalledWith({
+      ticketNumber: 7,
+      department: 'Datacenter',
+      informer: 'ana@x.com',
+      approver: 'Beto',
+      status: TicketStatus.APPROVED,
+      fileContent: 'apiVersion: apps/v1',
+    });
+    expect(createAdministration).not.toHaveBeenCalled();
     expect(createDatabaseAction).not.toHaveBeenCalled();
   });
 });

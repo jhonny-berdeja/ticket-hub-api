@@ -1,22 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { DatacenterTicketsRepository } from '../../common/database/ticket/datacenter-tickets.repository';
 import { DatabaseTicketsRepository } from '../../common/database/ticket/database-tickets.repository';
+import { KubernetesTicketsRepository } from '../../common/database/ticket/kubernetes-tickets.repository';
 import { ResponseBody } from '../../common/dto/response-body.dto';
 import { CreateAnsibleTicketDto } from './dto/create-ansible-ticket.dto';
 import { CreateDatabaseTicketDto } from './dto/create-database-ticket.dto';
+import { CreateKubernetesTicketDto } from './dto/create-kubernetes-ticket.dto';
 import { TicketMapper } from './ticket.mapper';
 import { TicketResponse } from './ticket-response';
 
 /**
- * `TicketsService.createAnsible`/`createDatabase` consolidated here: one
- * method per ticket kind, each keeping its own numbering/persistence flow
- * scoped to its own repository/mapper pair.
+ * `TicketsService.createAnsible`/`createDatabase`/`createKubernetes`
+ * consolidated here: one method per ticket kind, each keeping its own
+ * numbering/persistence flow scoped to its own repository/mapper pair.
  */
 @Injectable()
 export class CreateTicketService {
   constructor(
     private readonly datacenterTicketsRepository: DatacenterTicketsRepository,
     private readonly databaseTicketsRepository: DatabaseTicketsRepository,
+    private readonly kubernetesTicketsRepository: KubernetesTicketsRepository,
   ) {}
 
   async createAnsible(
@@ -58,6 +61,27 @@ export class CreateTicketService {
     return ResponseBody.builder<TicketResponse>()
       .withMsg('Ticket created successfully')
       .withData(TicketMapper.toDatabaseResponse(createdTicket))
+      .build();
+  }
+
+  async createKubernetes(
+    dto: CreateKubernetesTicketDto,
+    informer: string,
+  ): Promise<ResponseBody<TicketResponse>> {
+    const maxNumber = await this.kubernetesTicketsRepository.findMaxNumber();
+    const nextNumber = (maxNumber ?? 0) + 1;
+
+    const ticketEntity = TicketMapper.toKubernetesEntity(
+      dto,
+      informer,
+      nextNumber,
+    );
+    const createdTicket =
+      await this.kubernetesTicketsRepository.createTicket(ticketEntity);
+
+    return ResponseBody.builder<TicketResponse>()
+      .withMsg('Ticket created successfully')
+      .withData(TicketMapper.toKubernetesResponse(createdTicket))
       .build();
   }
 }

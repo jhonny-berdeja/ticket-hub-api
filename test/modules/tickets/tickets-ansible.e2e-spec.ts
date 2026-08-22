@@ -58,6 +58,7 @@ describe('POST /tickets/ansible (e2e, in-memory DB)', () => {
         description: 'El servidor de prod no responde',
         ticketType: 'ANSIBLE',
         codeAnsible: 'playbook: restart.yml',
+        codeYaml: null,
         response: null,
         namespace: null,
         deployment: null,

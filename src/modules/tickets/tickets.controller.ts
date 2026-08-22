@@ -16,6 +16,7 @@ import type { AuthenticatedUser } from '../auth/authenticated-user';
 import { ResponseBody } from '../../common/dto/response-body.dto';
 import { CreateAnsibleTicketDto } from './dto/create-ansible-ticket.dto';
 import { CreateDatabaseTicketDto } from './dto/create-database-ticket.dto';
+import { CreateKubernetesTicketDto } from './dto/create-kubernetes-ticket.dto';
 import { ApproveTicketService } from './approve-ticket.service';
 import { CreateTicketService } from './create-ticket.service';
 import { FindTicketByNumberService } from './find-ticket-by-number.service';
@@ -55,6 +56,15 @@ export class TicketsController {
     return this.createTicketService.createDatabase(dto, user.email);
   }
 
+  @Post('kubernetes')
+  @HttpCode(HttpStatus.CREATED)
+  createKubernetes(
+    @Body() dto: CreateKubernetesTicketDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ResponseBody<TicketResponse>> {
+    return this.createTicketService.createKubernetes(dto, user.email);
+  }
+
   @Get('ansible')
   findAnsibleMineOrAll(
     @CurrentUser() user: AuthenticatedUser,
@@ -67,6 +77,13 @@ export class TicketsController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse[]>> {
     return this.listTicketsService.findDatabaseMineOrAll(user);
+  }
+
+  @Get('kubernetes')
+  findKubernetesMineOrAll(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ResponseBody<TicketResponse[]>> {
+    return this.listTicketsService.findKubernetesMineOrAll(user);
   }
 
   /**
@@ -91,6 +108,17 @@ export class TicketsController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ResponseBody<TicketResponse>> {
     return this.findTicketByNumberService.findDatabaseByNumber(number, user);
+  }
+
+  @Get('kubernetes/by-number/:number')
+  findKubernetesByNumber(
+    @Param('number', ParseIntPipe) number: number,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ResponseBody<TicketResponse>> {
+    return this.findTicketByNumberService.findKubernetesByNumber(
+      number,
+      user,
+    );
   }
 
   /** Proxies pcbox-api's allowlist so the create-ticket form's dropdown never hardcodes it — see design's "anti-drift" note. */
@@ -132,5 +160,13 @@ export class TicketsController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ResponseBody<TicketResponse>> {
     return this.approveTicketService.approveDatabase(id);
+  }
+
+  @Patch('kubernetes/:id/approve')
+  @Roles(Role.ADMIN)
+  approveKubernetes(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<ResponseBody<TicketResponse>> {
+    return this.approveTicketService.approveKubernetes(id);
   }
 }
