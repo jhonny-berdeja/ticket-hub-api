@@ -1,4 +1,5 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { KubernetesExecutionType } from './kubernetes-execution-type.enum';
 import { TicketStatus } from './ticket-status.enum';
 
 /**
@@ -46,6 +47,16 @@ export class KubernetesTicketEntity {
   @Column({ type: 'text', nullable: true })
   response!: string | null;
 
+  /**
+   * Which pcbox-api endpoint approval routes to (see
+   * `PcboxApiService.sendToConnector`) — `MANIFEST` keeps hitting
+   * `POST /kubernetes`, `ANSIBLE` hits the newer `POST /kubernetes/ansible`.
+   * Not nullable: every ticket must declare its execution flavor at
+   * creation time, no implicit default at the DB level.
+   */
+  @Column({ name: 'execution_type', type: 'varchar', length: 10 })
+  executionType!: KubernetesExecutionType;
+
   static builder(): KubernetesTicketEntityBuilder {
     return new KubernetesTicketEntityBuilder();
   }
@@ -61,6 +72,7 @@ export class KubernetesTicketEntityBuilder {
   private description?: string;
   private codeYaml: string | null = null;
   private response: string | null = null;
+  private executionType?: KubernetesExecutionType;
 
   withNumber(number: number): this {
     this.number = number;
@@ -107,6 +119,11 @@ export class KubernetesTicketEntityBuilder {
     return this;
   }
 
+  withExecutionType(executionType: KubernetesExecutionType): this {
+    this.executionType = executionType;
+    return this;
+  }
+
   build(): KubernetesTicketEntity {
     if (this.number === undefined) {
       throw new Error('KubernetesTicketEntity.Builder: number is required');
@@ -115,9 +132,7 @@ export class KubernetesTicketEntityBuilder {
       throw new Error('KubernetesTicketEntity.Builder: informer is required');
     }
     if (this.department === undefined) {
-      throw new Error(
-        'KubernetesTicketEntity.Builder: department is required',
-      );
+      throw new Error('KubernetesTicketEntity.Builder: department is required');
     }
     if (this.subject === undefined) {
       throw new Error('KubernetesTicketEntity.Builder: subject is required');
@@ -128,6 +143,11 @@ export class KubernetesTicketEntityBuilder {
     if (this.description === undefined) {
       throw new Error(
         'KubernetesTicketEntity.Builder: description is required',
+      );
+    }
+    if (this.executionType === undefined) {
+      throw new Error(
+        'KubernetesTicketEntity.Builder: executionType is required',
       );
     }
 
@@ -141,6 +161,7 @@ export class KubernetesTicketEntityBuilder {
     entity.description = this.description;
     entity.codeYaml = this.codeYaml;
     entity.response = this.response;
+    entity.executionType = this.executionType;
     return entity;
   }
 }

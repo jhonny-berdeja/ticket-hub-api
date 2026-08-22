@@ -1,9 +1,13 @@
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { KubernetesExecutionType } from '../../../common/database/ticket/kubernetes-execution-type.enum';
 
 /**
  * `POST /tickets/kubernetes` — `ticketType` is fixed to `KUBERNETES`
  * server-side (see `TicketsController.createKubernetes`), never accepted
- * from the client.
+ * from the client. `executionType`, on the other hand, IS caller-supplied:
+ * it decides which pcbox-api endpoint approval will hit (see
+ * `PcboxApiService.sendToConnector`), and that's a choice the requester
+ * makes when filing the ticket, not something derivable server-side.
  */
 export class CreateKubernetesTicketDto {
   @IsString()
@@ -27,4 +31,7 @@ export class CreateKubernetesTicketDto {
   @IsNotEmpty()
   @MaxLength(500)
   codeYaml?: string;
+
+  @IsEnum(KubernetesExecutionType)
+  executionType: KubernetesExecutionType;
 }

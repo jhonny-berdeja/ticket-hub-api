@@ -75,6 +75,7 @@ export class TicketMapper {
       .withStatus(TicketStatus.CREATED)
       .withDescription(dto.description)
       .withCodeYaml(dto.codeYaml ?? null)
+      .withExecutionType(dto.executionType)
       .build();
   }
 
@@ -101,6 +102,7 @@ export class TicketMapper {
       deployment: null,
       dbName: null,
       sqlCode: null,
+      executionType: null,
     };
   }
 
@@ -123,6 +125,7 @@ export class TicketMapper {
       deployment: ticket.dbDeployment,
       dbName: ticket.dbName,
       sqlCode: ticket.sqlCode,
+      executionType: null,
     };
   }
 
@@ -145,6 +148,7 @@ export class TicketMapper {
       deployment: null,
       dbName: null,
       sqlCode: null,
+      executionType: ticket.executionType,
     };
   }
 }

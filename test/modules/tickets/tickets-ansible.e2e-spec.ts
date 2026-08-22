@@ -64,6 +64,7 @@ describe('POST /tickets/ansible (e2e, in-memory DB)', () => {
         deployment: null,
         dbName: null,
         sqlCode: null,
+        executionType: null,
       },
     });
   });

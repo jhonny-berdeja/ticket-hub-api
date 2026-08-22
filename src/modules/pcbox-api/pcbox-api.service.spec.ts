@@ -2,6 +2,7 @@ import { PcboxApiService } from './pcbox-api.service';
 import { PcboxApiConnector } from './pcbox-api.connector';
 import { DatacenterTicketEntity } from '../../common/database/ticket/datacenter-ticket.entity';
 import { DatabaseTicketEntity } from '../../common/database/ticket/database-ticket.entity';
+import { KubernetesExecutionType } from '../../common/database/ticket/kubernetes-execution-type.enum';
 import { KubernetesTicketEntity } from '../../common/database/ticket/kubernetes-ticket.entity';
 import { TicketStatus } from '../../common/database/ticket/ticket-status.enum';
 
@@ -100,7 +101,7 @@ describe('PcboxApiService — entity-class-aware routing', () => {
     expect(createDatabaseAction).not.toHaveBeenCalled();
   });
 
-  it('forwards a flat body to createKubernetesAction for a KubernetesTicketEntity', async () => {
+  it('forwards a flat body to createKubernetesAction for a KubernetesTicketEntity with executionType MANIFEST', async () => {
     const ticket = KubernetesTicketEntity.builder()
       .withNumber(7)
       .withInformer('ana@x.com')
@@ -110,6 +111,7 @@ describe('PcboxApiService — entity-class-aware routing', () => {
       .withStatus(TicketStatus.APPROVED)
       .withDescription('desc')
       .withCodeYaml('apiVersion: apps/v1')
+      .withExecutionType(KubernetesExecutionType.MANIFEST)
       .build();
 
     const createKubernetesAction = jest.fn().mockResolvedValue(
@@ -120,10 +122,12 @@ describe('PcboxApiService — entity-class-aware routing', () => {
         },
       }),
     );
+    const createKubernetesAnsibleAction = jest.fn();
     const createAdministration = jest.fn();
     const createDatabaseAction = jest.fn();
     const connector = {
       createKubernetesAction,
+      createKubernetesAnsibleAction,
       createAdministration,
       createDatabaseAction,
     } as unknown as PcboxApiConnector;
@@ -139,6 +143,54 @@ describe('PcboxApiService — entity-class-aware routing', () => {
       status: TicketStatus.APPROVED,
       fileContent: 'apiVersion: apps/v1',
     });
+    expect(createKubernetesAnsibleAction).not.toHaveBeenCalled();
+    expect(createAdministration).not.toHaveBeenCalled();
+    expect(createDatabaseAction).not.toHaveBeenCalled();
+  });
+
+  it('forwards a flat body to createKubernetesAnsibleAction for a KubernetesTicketEntity with executionType ANSIBLE', async () => {
+    const ticket = KubernetesTicketEntity.builder()
+      .withNumber(8)
+      .withInformer('ana@x.com')
+      .withAssignee('Beto')
+      .withDepartment('Datacenter')
+      .withSubject('Deploy via playbook')
+      .withStatus(TicketStatus.APPROVED)
+      .withDescription('desc')
+      .withCodeYaml('apiVersion: apps/v1')
+      .withExecutionType(KubernetesExecutionType.ANSIBLE)
+      .build();
+
+    const createKubernetesAnsibleAction = jest.fn().mockResolvedValue(
+      buildResponse(201, {
+        msg: 'ok',
+        data: {
+          execution: { success: true, exitCode: 0, stdout: '', stderr: '' },
+        },
+      }),
+    );
+    const createKubernetesAction = jest.fn();
+    const createAdministration = jest.fn();
+    const createDatabaseAction = jest.fn();
+    const connector = {
+      createKubernetesAction,
+      createKubernetesAnsibleAction,
+      createAdministration,
+      createDatabaseAction,
+    } as unknown as PcboxApiConnector;
+    const service = new PcboxApiService(connector);
+
+    await service.notifyApproval(ticket);
+
+    expect(createKubernetesAnsibleAction).toHaveBeenCalledWith({
+      ticketNumber: 8,
+      department: 'Datacenter',
+      informer: 'ana@x.com',
+      approver: 'Beto',
+      status: TicketStatus.APPROVED,
+      fileContent: 'apiVersion: apps/v1',
+    });
+    expect(createKubernetesAction).not.toHaveBeenCalled();
     expect(createAdministration).not.toHaveBeenCalled();
     expect(createDatabaseAction).not.toHaveBeenCalled();
   });

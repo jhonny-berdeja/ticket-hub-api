@@ -1,3 +1,4 @@
+import { KubernetesExecutionType } from '../../common/database/ticket/kubernetes-execution-type.enum';
 import { TicketStatus } from '../../common/database/ticket/ticket-status.enum';
 import { TicketType } from '../../common/database/ticket/ticket-type.enum';
 
@@ -25,4 +26,5 @@ export interface TicketResponse {
   deployment: string | null;
   dbName: string | null;
   sqlCode: string | null;
+  executionType: KubernetesExecutionType | null;
 }

@@ -3,6 +3,7 @@ import { CreateAnsibleTicketDto } from './dto/create-ansible-ticket.dto';
 import { CreateDatabaseTicketDto } from './dto/create-database-ticket.dto';
 import { CreateKubernetesTicketDto } from './dto/create-kubernetes-ticket.dto';
 import { TicketType } from '../../common/database/ticket/ticket-type.enum';
+import { KubernetesExecutionType } from '../../common/database/ticket/kubernetes-execution-type.enum';
 
 function buildKubernetesDto(): CreateKubernetesTicketDto {
   const dto = new CreateKubernetesTicketDto();
@@ -11,6 +12,7 @@ function buildKubernetesDto(): CreateKubernetesTicketDto {
   dto.subject = 'Deploy';
   dto.description = 'Please deploy';
   dto.codeYaml = 'apiVersion: apps/v1';
+  dto.executionType = KubernetesExecutionType.MANIFEST;
   return dto;
 }
 
@@ -70,6 +72,7 @@ describe('TicketMapper — DATABASE field carrying', () => {
     expect(response.sqlCode).toBe('SELECT 1;');
     expect(response.codeAnsible).toBeNull();
     expect(response.codeYaml).toBeNull();
+    expect(response.executionType).toBeNull();
   });
 });
 
@@ -103,11 +106,12 @@ describe('TicketMapper — ANSIBLE field carrying', () => {
     expect(response.deployment).toBeNull();
     expect(response.dbName).toBeNull();
     expect(response.sqlCode).toBeNull();
+    expect(response.executionType).toBeNull();
   });
 });
 
 describe('TicketMapper — KUBERNETES field carrying', () => {
-  it('toKubernetesEntity carries the KUBERNETES fields', () => {
+  it('toKubernetesEntity carries the KUBERNETES fields, including executionType', () => {
     const entity = TicketMapper.toKubernetesEntity(
       buildKubernetesDto(),
       'ana@x.com',
@@ -116,6 +120,16 @@ describe('TicketMapper — KUBERNETES field carrying', () => {
 
     expect(entity.informer).toBe('ana@x.com');
     expect(entity.codeYaml).toBe('apiVersion: apps/v1');
+    expect(entity.executionType).toBe(KubernetesExecutionType.MANIFEST);
+  });
+
+  it('toKubernetesEntity carries executionType ANSIBLE when the DTO requests it', () => {
+    const dto = buildKubernetesDto();
+    dto.executionType = KubernetesExecutionType.ANSIBLE;
+
+    const entity = TicketMapper.toKubernetesEntity(dto, 'ana@x.com', 1);
+
+    expect(entity.executionType).toBe(KubernetesExecutionType.ANSIBLE);
   });
 
   it('toKubernetesResponse derives ticketType KUBERNETES and leaves other-kind fields null', () => {
@@ -136,5 +150,6 @@ describe('TicketMapper — KUBERNETES field carrying', () => {
     expect(response.deployment).toBeNull();
     expect(response.dbName).toBeNull();
     expect(response.sqlCode).toBeNull();
+    expect(response.executionType).toBe(KubernetesExecutionType.MANIFEST);
   });
 });
