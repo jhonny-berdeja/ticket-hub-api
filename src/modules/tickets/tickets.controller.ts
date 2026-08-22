@@ -118,11 +118,19 @@ export class TicketsController {
       .build();
   }
 
-  @Patch(':id/approve')
+  @Patch('ansible/:id/approve')
   @Roles(Role.ADMIN)
-  approve(
+  approveAnsible(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ResponseBody<TicketResponse>> {
-    return this.approveTicketService.approve(id);
+    return this.approveTicketService.approveAnsible(id);
+  }
+
+  @Patch('database/:id/approve')
+  @Roles(Role.ADMIN)
+  approveDatabase(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<ResponseBody<TicketResponse>> {
+    return this.approveTicketService.approveDatabase(id);
   }
 }

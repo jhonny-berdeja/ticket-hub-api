@@ -248,7 +248,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
 
   it('rejects approval from a non-ADMIN', async () => {
     await request(app.getHttpServer())
-      .patch('/tickets/1/approve')
+      .patch('/tickets/ansible/1/approve')
       .set('Authorization', `Bearer ${creatorToken}`)
       .expect(403);
   });
@@ -257,7 +257,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     mockPcboxApiSuccess(fetchSpy);
 
     const response = await request(app.getHttpServer())
-      .patch('/tickets/1/approve')
+      .patch('/tickets/ansible/1/approve')
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
@@ -312,7 +312,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     fetchSpy.mockRejectedValue(new Error('ECONNREFUSED'));
 
     const response = await request(app.getHttpServer())
-      .patch('/tickets/2/approve')
+      .patch('/tickets/ansible/2/approve')
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
@@ -321,6 +321,43 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     };
     expect(body.data.status).toBe('APPROVED');
     expect(body.data.response).toBe('pcbox-api unreachable: ECONNREFUSED');
+  });
+
+  it('approves each route to its own table when both a datacenter and a database ticket share the same bare id', async () => {
+    // Datacenter ticket #2 (DC-2) was just approved above. Database ticket
+    // #2 (DB-2, created earlier in this suite) shares the same bare `id`
+    // but lives in a different table — approving it must never fall
+    // through to (or be satisfied by) the already-approved datacenter row.
+    mockPcboxApiSuccess(fetchSpy);
+
+    const response = await request(app.getHttpServer())
+      .patch('/tickets/database/2/approve')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    const body = response.body as {
+      data: { id: number; ticketType: string; status: string };
+    };
+    expect(body.data).toEqual(
+      expect.objectContaining({
+        id: 2,
+        ticketType: 'DATABASE',
+        status: 'APPROVED',
+      }),
+    );
+
+    // The datacenter ticket sharing id 2 stays exactly as approved before,
+    // untouched by this second approval.
+    const ansibleResponse = await request(app.getHttpServer())
+      .get('/tickets/ansible/by-number/2')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(
+      (ansibleResponse.body as { data: { ticketType: string; status: string } })
+        .data,
+    ).toEqual(
+      expect.objectContaining({ ticketType: 'ANSIBLE', status: 'APPROVED' }),
+    );
   });
 
   it("GET /tickets/db-targets proxies pcbox-api's allowlist verbatim, from /database/db-targets", async () => {
@@ -387,9 +424,18 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
     );
   });
 
-  it('404s approving a ticket that does not exist', async () => {
+  it('404s approving an ansible ticket that does not exist', async () => {
     await request(app.getHttpServer())
-      .patch('/tickets/999/approve')
+      .patch('/tickets/ansible/999/approve')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(404);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('404s approving a database ticket that does not exist', async () => {
+    await request(app.getHttpServer())
+      .patch('/tickets/database/999/approve')
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(404);
 

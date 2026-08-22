@@ -103,7 +103,7 @@ describe('POST /tickets/database (e2e, in-memory DB)', () => {
     mockPcboxApiSuccess(fetchSpy);
 
     await request(app.getHttpServer())
-      .patch(`/tickets/${createdBody.data.id}/approve`)
+      .patch(`/tickets/database/${createdBody.data.id}/approve`)
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 

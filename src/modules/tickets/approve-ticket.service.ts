@@ -9,6 +9,13 @@ import { TicketResponse } from './ticket-response';
 
 const TICKET_NOT_FOUND_MESSAGE = 'Ticket not found';
 
+/**
+ * `id` alone doesn't say which table a ticket lives in (each table has its
+ * own primary key sequence) — the caller now states which table via the
+ * route, so each public method queries only its own table. No probing/
+ * fallback across tables happens here anymore (see the by-number split in
+ * `FindTicketByNumberService` for the same pattern).
+ */
 @Injectable()
 export class ApproveTicketService {
   constructor(
@@ -17,29 +24,12 @@ export class ApproveTicketService {
     private readonly pcboxApiService: PcboxApiService,
   ) {}
 
-  /**
-   * `id` alone doesn't say which table a ticket lives in (each table has
-   * its own primary key sequence) — probe `datacenter_tickets` first,
-   * then `database_tickets`, and approve on whichever one has it.
-   */
-  async approve(id: number): Promise<ResponseBody<TicketResponse>> {
-    const datacenterTicket =
-      await this.datacenterTicketsRepository.findById(id);
-    if (datacenterTicket) {
-      return this.approveDatacenterTicket(id);
+  async approveAnsible(id: number): Promise<ResponseBody<TicketResponse>> {
+    const ticket = await this.datacenterTicketsRepository.findById(id);
+    if (!ticket) {
+      throw new NotFoundException(TICKET_NOT_FOUND_MESSAGE);
     }
 
-    const databaseTicket = await this.databaseTicketsRepository.findById(id);
-    if (databaseTicket) {
-      return this.approveDatabaseTicket(id);
-    }
-
-    throw new NotFoundException(TICKET_NOT_FOUND_MESSAGE);
-  }
-
-  private async approveDatacenterTicket(
-    id: number,
-  ): Promise<ResponseBody<TicketResponse>> {
     const approvedTicket = await this.datacenterTicketsRepository.updateStatus(
       id,
       TicketStatus.APPROVED,
@@ -58,9 +48,12 @@ export class ApproveTicketService {
       .build();
   }
 
-  private async approveDatabaseTicket(
-    id: number,
-  ): Promise<ResponseBody<TicketResponse>> {
+  async approveDatabase(id: number): Promise<ResponseBody<TicketResponse>> {
+    const ticket = await this.databaseTicketsRepository.findById(id);
+    if (!ticket) {
+      throw new NotFoundException(TICKET_NOT_FOUND_MESSAGE);
+    }
+
     const approvedTicket = await this.databaseTicketsRepository.updateStatus(
       id,
       TicketStatus.APPROVED,
