@@ -452,6 +452,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
         subject: 'Deploy pod',
         description: 'Necesito desplegar un pod',
         codeYaml: 'apiVersion: apps/v1',
+        executionType: 'MANIFEST',
       })
       .expect(201);
 
@@ -472,6 +473,7 @@ describe('Tickets flow (e2e, in-memory DB)', () => {
         subject: 'Deploy another pod',
         description: 'Please deploy',
         codeYaml: 'apiVersion: apps/v1',
+        executionType: 'MANIFEST',
       })
       .expect(201);
 

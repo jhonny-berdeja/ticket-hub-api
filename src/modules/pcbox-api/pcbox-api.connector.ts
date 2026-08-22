@@ -45,6 +45,17 @@ export interface PcboxApiCreateKubernetesActionBody {
   fileContent: string;
 }
 
+/**
+ * `POST /kubernetes/ansible` — same flat body shape as
+ * `createKubernetesAction`, playbook-driven execution instead of applying
+ * `fileContent` as a raw manifest. Routed to from
+ * `PcboxApiService.sendToConnector` when the originating
+ * `KubernetesTicketEntity.executionType` is `ANSIBLE` (see
+ * `kubernetes-execution-type.enum.ts`).
+ */
+export type PcboxApiCreateKubernetesAnsibleActionBody =
+  PcboxApiCreateKubernetesActionBody;
+
 export interface DbTarget {
   namespace: string;
   deployment: string;
@@ -84,6 +95,13 @@ export class PcboxApiConnector {
     body: PcboxApiCreateKubernetesActionBody,
   ): Promise<Response> {
     return this.postJson('/kubernetes', body);
+  }
+
+  /** `POST /kubernetes/ansible` — the ANSIBLE-execution counterpart of `createKubernetesAction`. */
+  createKubernetesAnsibleAction(
+    body: PcboxApiCreateKubernetesAnsibleActionBody,
+  ): Promise<Response> {
+    return this.postJson('/kubernetes/ansible', body);
   }
 
   /** Proxies pcbox-api's `GET /database/db-targets` — the single source of truth for the DATABASE-ticket allowlist (see design's "anti-drift" note). */

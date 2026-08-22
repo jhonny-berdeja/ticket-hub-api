@@ -89,6 +89,7 @@ describe('POST /tickets/kubernetes (e2e, in-memory DB)', () => {
         subject: 'Deploy pod',
         description: 'Necesito desplegar un pod',
         codeYaml: 'apiVersion: apps/v1\nkind: Deployment',
+        executionType: 'MANIFEST',
       })
       .expect(201);
 
@@ -111,6 +112,7 @@ describe('POST /tickets/kubernetes (e2e, in-memory DB)', () => {
         deployment: null,
         dbName: null,
         sqlCode: null,
+        executionType: 'MANIFEST',
       },
     });
   });
@@ -125,6 +127,7 @@ describe('POST /tickets/kubernetes (e2e, in-memory DB)', () => {
         subject: 'Deploy another pod',
         description: 'Necesito desplegar otro pod',
         codeYaml: 'apiVersion: apps/v1\nkind: Deployment',
+        executionType: 'MANIFEST',
       })
       .expect(201);
 
@@ -159,5 +162,55 @@ describe('POST /tickets/kubernetes (e2e, in-memory DB)', () => {
     });
     expect(sentBody.ticketType).toBeUndefined();
     expect(sentBody.namespace).toBeUndefined();
+  });
+
+  it('creates and approves a KUBERNETES ticket with executionType ANSIBLE, forwarding the flat action to pcbox-api at /kubernetes/ansible', async () => {
+    const createResponse = await request(app.getHttpServer())
+      .post('/tickets/kubernetes')
+      .set('Authorization', `Bearer ${creatorToken}`)
+      .send({
+        assignee: 'Ana Aprobadora',
+        department: 'Datacenter',
+        subject: 'Deploy via playbook',
+        description: 'Necesito desplegar via playbook',
+        codeYaml: 'apiVersion: apps/v1\nkind: Deployment',
+        executionType: 'ANSIBLE',
+      })
+      .expect(201);
+
+    const createdBody = createResponse.body as {
+      data: { id: number; executionType: string };
+    };
+    expect(createdBody.data.executionType).toBe('ANSIBLE');
+
+    mockPcboxApiSuccess(fetchSpy);
+
+    await request(app.getHttpServer())
+      .patch(`/tickets/kubernetes/${createdBody.data.id}/approve`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    const ansibleCall = fetchSpy.mock.calls.find(
+      ([url]) => url === 'http://pcbox-api.test/kubernetes/ansible',
+    );
+    expect(ansibleCall).toBeDefined();
+
+    const [, requestInit] = ansibleCall!;
+    const sentBody = JSON.parse(
+      (requestInit as RequestInit).body as string,
+    ) as Record<string, unknown>;
+    expect(sentBody).toEqual({
+      ticketNumber: sentBody.ticketNumber,
+      department: 'Datacenter',
+      informer: CREATOR_EMAIL,
+      approver: 'Ana Aprobadora',
+      status: 'APPROVED',
+      fileContent: 'apiVersion: apps/v1\nkind: Deployment',
+    });
+
+    const manifestCall = fetchSpy.mock.calls.find(
+      ([url]) => url === 'http://pcbox-api.test/kubernetes',
+    );
+    expect(manifestCall).toBeUndefined();
   });
 });

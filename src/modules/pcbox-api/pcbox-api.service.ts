@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DatacenterTicketEntity } from '../../common/database/ticket/datacenter-ticket.entity';
 import { DatabaseTicketEntity } from '../../common/database/ticket/database-ticket.entity';
+import { KubernetesExecutionType } from '../../common/database/ticket/kubernetes-execution-type.enum';
 import { KubernetesTicketEntity } from '../../common/database/ticket/kubernetes-ticket.entity';
 import { DbTarget, PcboxApiConnector } from './pcbox-api.connector';
 
@@ -27,7 +28,8 @@ export class PcboxApiService {
   constructor(private readonly pcboxApiConnector: PcboxApiConnector) {}
 
   async notifyApproval(
-    ticket: DatacenterTicketEntity | DatabaseTicketEntity | KubernetesTicketEntity,
+    ticket:
+      DatacenterTicketEntity | DatabaseTicketEntity | KubernetesTicketEntity,
   ): Promise<string> {
     if (ticket.assignee === null) {
       return UNASSIGNED_MESSAGE;
@@ -54,9 +56,17 @@ export class PcboxApiService {
    * `database` object) and `POST /kubernetes` (flat KUBERNETES body, same
    * shape as `/pcbox`). There is no `ticketType` column anymore, so the
    * entity's own class stands in for the old discriminator.
+   *
+   * For `KubernetesTicketEntity` specifically, there's a second branch
+   * inside the class check: `executionType` (a column on that table, see
+   * `kubernetes-execution-type.enum.ts`) picks between pcbox-api's two
+   * KUBERNETES endpoints — `MANIFEST` keeps going to `POST /kubernetes`
+   * (unchanged behavior), `ANSIBLE` goes to the newer
+   * `POST /kubernetes/ansible`. Same body shape either way.
    */
   private sendToConnector(
-    ticket: DatacenterTicketEntity | DatabaseTicketEntity | KubernetesTicketEntity,
+    ticket:
+      DatacenterTicketEntity | DatabaseTicketEntity | KubernetesTicketEntity,
     assignee: string,
   ): Promise<Response> {
     const base = {
@@ -78,10 +88,14 @@ export class PcboxApiService {
     }
 
     if (ticket instanceof KubernetesTicketEntity) {
-      return this.pcboxApiConnector.createKubernetesAction({
+      const kubernetesBody = {
         ...base,
         fileContent: ticket.codeYaml ?? '',
-      });
+      };
+
+      return ticket.executionType === KubernetesExecutionType.ANSIBLE
+        ? this.pcboxApiConnector.createKubernetesAnsibleAction(kubernetesBody)
+        : this.pcboxApiConnector.createKubernetesAction(kubernetesBody);
     }
 
     return this.pcboxApiConnector.createAdministration({
