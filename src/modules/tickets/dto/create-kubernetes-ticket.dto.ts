@@ -29,7 +29,6 @@ export class CreateKubernetesTicketDto {
 
   @IsString()
   @IsNotEmpty()
-  @MaxLength(500)
   codeYaml?: string;
 
   @IsEnum(KubernetesExecutionType)

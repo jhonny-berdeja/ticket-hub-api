@@ -29,4 +29,12 @@ describe('CreateAnsibleTicketDto', () => {
     });
     expect(errors).toHaveLength(0);
   });
+
+  it('accepts a codeAnsible longer than the former 500-character cap', async () => {
+    const errors = await validateDto({
+      ...baseAnsible,
+      codeAnsible: 'a'.repeat(5001),
+    });
+    expect(errors).toHaveLength(0);
+  });
 });

@@ -60,4 +60,13 @@ describe('CreateKubernetesTicketDto', () => {
     });
     expect(errors).toHaveLength(0);
   });
+
+  it('accepts a codeYaml longer than the former 500-character cap', async () => {
+    const errors = await validateDto({
+      ...baseKubernetes,
+      codeYaml: 'a'.repeat(5001),
+      executionType: KubernetesExecutionType.MANIFEST,
+    });
+    expect(errors).toHaveLength(0);
+  });
 });

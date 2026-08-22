@@ -24,6 +24,5 @@ export class CreateAnsibleTicketDto {
 
   @IsString()
   @IsNotEmpty()
-  @MaxLength(500)
   codeAnsible?: string;
 }

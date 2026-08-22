@@ -36,8 +36,7 @@ export class DatacenterTicketEntity {
 
   @Column({
     name: 'code_ansible',
-    type: 'varchar',
-    length: 5000,
+    type: 'text',
     nullable: true,
   })
   codeAnsible!: string | null;

@@ -38,8 +38,7 @@ export class KubernetesTicketEntity {
 
   @Column({
     name: 'code_yaml',
-    type: 'varchar',
-    length: 5000,
+    type: 'text',
     nullable: true,
   })
   codeYaml!: string | null;
